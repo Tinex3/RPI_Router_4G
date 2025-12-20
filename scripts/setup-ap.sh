@@ -146,19 +146,26 @@ netfilter-persistent save
 echo "   ✅ Firewall configurado"
 
 echo ""
-echo "8️⃣  Habilitando y reiniciando servicios..."
+echo "8️⃣  Configurando inicio automático..."
+
+# Instalar servicio de configuración wlan0
+cp "$SCRIPT_DIR/../systemd/wlan0-ap.service" /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable wlan0-ap.service
+
+echo "   ✅ Servicio wlan0-ap habilitado"
+
 systemctl unmask hostapd
 systemctl enable hostapd
 systemctl enable dnsmasq
 
-# Reiniciar según sistema de red
-if [ -f /etc/dhcpcd.conf ]; then
-  echo "   🔄 Reiniciando dhcpcd..."
-  systemctl restart dhcpcd
-  sleep 2
-fi
+echo "   ✅ hostapd y dnsmasq habilitados para arranque automático"
 
-# Iniciar servicios
+# Iniciar servicio wlan0-ap primero
+systemctl start wlan0-ap.service
+sleep 1
+
+# Iniciar servicios AP
 systemctl restart hostapd
 systemctl restart dnsmasq
 

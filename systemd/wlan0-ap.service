@@ -1,0 +1,18 @@
+[Unit]
+Description=Configure wlan0 for Access Point
+Before=hostapd.service
+After=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# Configurar interfaz wlan0
+ExecStart=/bin/sh -c 'nmcli device set wlan0 managed no 2>/dev/null || true'
+ExecStart=/sbin/ip addr flush dev wlan0
+ExecStart=/sbin/ip addr add 192.168.50.1/24 dev wlan0
+ExecStart=/sbin/ip link set wlan0 up
+
+[Install]
+WantedBy=multi-user.target
