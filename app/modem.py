@@ -17,7 +17,13 @@ def find_at_port(force_refresh=False):
     if not force_refresh and _cached_port and (time.time() - _cache_time < CACHE_DURATION):
         return _cached_port
     
-    for p in sorted(glob.glob("/dev/ttyUSB*")):
+    # Prioridad de puertos: ttyUSB2 primero (típico del EC25), luego el resto
+    all_ports = glob.glob("/dev/ttyUSB*")
+    priority_ports = ["/dev/ttyUSB2", "/dev/ttyUSB3"]
+    remaining_ports = sorted([p for p in all_ports if p not in priority_ports])
+    ports_to_test = priority_ports + remaining_ports
+    
+    for p in ports_to_test:
         try:
             logger.debug(f"Probando puerto AT: {p}")
             with serial.Serial(p, BAUDRATE, timeout=1, rtscts=False, dsrdtr=False) as s:
