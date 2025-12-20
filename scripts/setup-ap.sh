@@ -17,17 +17,44 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "1️⃣  Instalando hostapd y dnsmasq..."
-apt update
-apt install -y hostapd dnsmasq
+echo "1️⃣  Verificando conectividad a Internet..."
+if ! ping -c 1 8.8.8.8 &>/dev/null; then
+  echo "   ⚠️  Sin conectividad a Internet"
+  echo "   Verificando si los paquetes ya están instalados..."
+fi
 
 echo ""
-echo "2️⃣  Deteniendo servicios..."
+echo "2️⃣  Descargando/verificando paquetes necesarios..."
+apt update || echo "   ⚠️  No se pudo actualizar repositorios, usando cache local"
+
+# Verificar si ya están instalados
+HOSTAPD_INSTALLED=$(dpkg -l | grep -c "^ii  hostapd" || echo "0")
+DNSMASQ_INSTALLED=$(dpkg -l | grep -c "^ii  dnsmasq" || echo "0")
+
+if [ "$HOSTAPD_INSTALLED" = "0" ] || [ "$DNSMASQ_INSTALLED" = "0" ]; then
+  echo "   📦 Instalando paquetes faltantes..."
+  if ! apt install -y hostapd dnsmasq; then
+    echo ""
+    echo "   ❌ ERROR: No se pudieron instalar los paquetes"
+    echo "   Verifica tu conectividad a Internet y vuelve a intentar."
+    echo ""
+    echo "   Comandos de diagnóstico:"
+    echo "     ping -c 2 8.8.8.8"
+    echo "     ip route show"
+    echo "     cat /etc/resolv.conf"
+    exit 1
+  fi
+else
+  echo "   ✅ hostapd y dnsmasq ya están instalados"
+fi
+
+echo ""
+echo "3️⃣  Deteniendo servicios..."
 systemctl stop hostapd 2>/dev/null || true
 systemctl stop dnsmasq 2>/dev/null || true
 
 echo ""
-echo "3️⃣  Configurando interfaz wlan0..."
+echo "4️⃣  Configurando interfaz wlan0..."
 
 # Detectar sistema de red
 if [ -f /etc/dhcpcd.conf ]; then
@@ -100,7 +127,7 @@ else
 fi
 
 echo ""
-echo "4️⃣  Configurando hostapd..."
+echo "5️⃣  Configurando hostapd..."
 cp "$SCRIPT_DIR/../config/hostapd.conf" /etc/hostapd/hostapd.conf
 
 # Apuntar hostapd al archivo de configuración
@@ -115,7 +142,7 @@ echo "   🔑 Password: router4g2024"
 echo "   ⚠️  CAMBIAR PASSWORD en /etc/hostapd/hostapd.conf"
 
 echo ""
-echo "5️⃣  Configurando dnsmasq..."
+echo "6️⃣  Configurando dnsmasq..."
 
 # Backup original
 if [ -f /etc/dnsmasq.conf ] && [ ! -f /etc/dnsmasq.conf.backup ]; then
@@ -127,7 +154,7 @@ echo "   ✅ dnsmasq configurado"
 echo "   📡 DHCP Range: 192.168.50.10 - 192.168.50.100"
 
 echo ""
-echo "6️⃣  Habilitando IP forwarding (CRÍTICO para routing)..."
+echo "7️⃣  Habilitando IP forwarding (CRÍTICO para routing)..."
 # Activar inmediatamente
 echo 1 > /proc/sys/net/ipv4/ip_forward
 
@@ -146,7 +173,7 @@ sysctl -p > /dev/null 2>&1
 echo "   ✅ IP forwarding habilitado y persistente"
 
 echo ""
-echo "7️⃣  Configurando NAT/Firewall (LOS 3 PILARES DEL ROUTING)..."
+echo "8️⃣  Configurando NAT/Firewall (LOS 3 PILARES DEL ROUTING)..."
 
 # PILAR 1: Política FORWARD permisiva (por defecto DROP bloquea todo)
 iptables -P FORWARD ACCEPT
@@ -215,13 +242,13 @@ fi
 echo "   ✅ Firewall configurado y persistente"
 
 echo ""
-echo "8️⃣  Deteniendo ModemManager (puede interferir con WiFi)..."
+echo "9️⃣  Deteniendo ModemManager (puede interferir con WiFi)..."
 systemctl stop ModemManager 2>/dev/null || true
 systemctl disable ModemManager 2>/dev/null || true
 echo "   ✅ ModemManager deshabilitado"
 
 echo ""
-echo "9️⃣  Configurando inicio automático..."
+echo "🔟 Configurando inicio automático..."
 
 # Instalar servicio de configuración wlan0
 cp "$SCRIPT_DIR/../systemd/wlan0-ap.service" /etc/systemd/system/
