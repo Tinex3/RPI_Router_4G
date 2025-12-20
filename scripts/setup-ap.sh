@@ -58,7 +58,10 @@ elif systemctl is-active --quiet NetworkManager; then
   # Detener NetworkManager en wlan0
   nmcli device set wlan0 managed no 2>/dev/null || true
   
-  # Configurar IP estática manualmente
+  # Crear directorio si no existe
+  mkdir -p /etc/network/interfaces.d
+  
+  # Configurar IP estática
   cat > /etc/network/interfaces.d/wlan0 << 'EOF'
 auto wlan0
 iface wlan0 inet static
@@ -66,12 +69,14 @@ iface wlan0 inet static
     netmask 255.255.255.0
 EOF
   
-  echo "   ✅ IP estática configurada: 192.168.50.1/24"
+  echo "   ✅ Configuración guardada en /etc/network/interfaces.d/wlan0"
   
-  # Aplicar configuración
+  # Aplicar configuración inmediatamente
   ip addr flush dev wlan0 2>/dev/null || true
   ip addr add 192.168.50.1/24 dev wlan0
   ip link set wlan0 up
+  
+  echo "   ✅ IP aplicada: 192.168.50.1/24"
   
 else
   echo "   📡 Sistema: manual"
