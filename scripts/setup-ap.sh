@@ -53,10 +53,20 @@ EOF
   fi
   
 elif systemctl is-active --quiet NetworkManager; then
-  echo "   📡 Sistema: NetworkManager"
+  echo "   📡 Sistema: NetworkManager detectado"
   
-  # Detener NetworkManager en wlan0
-  nmcli device set wlan0 managed no 2>/dev/null || true
+  # ⚠️ SOLUCIÓN CRÍTICA: Excluir wlan0 de NetworkManager PERMANENTEMENTE
+  echo "   🔧 Excluyendo wlan0 del control de NetworkManager..."
+  mkdir -p /etc/NetworkManager/conf.d
+  cat > /etc/NetworkManager/conf.d/unmanaged-wlan0.conf << 'EOF'
+[keyfile]
+unmanaged-devices=interface-name:wlan0
+EOF
+  
+  # Reiniciar NetworkManager para aplicar cambios
+  systemctl restart NetworkManager
+  sleep 2
+  echo "   ✅ wlan0 excluido de NetworkManager (persistente)"
   
   # Crear directorio si no existe
   mkdir -p /etc/network/interfaces.d

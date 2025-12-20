@@ -1,18 +1,20 @@
 [Unit]
 Description=Configure wlan0 for Access Point
 Before=hostapd.service
-After=network-pre.target
-Wants=network-pre.target
+After=NetworkManager.service network.target
+Wants=network.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 
-# Configurar interfaz wlan0
-ExecStart=/bin/sh -c 'nmcli device set wlan0 managed no 2>/dev/null || true'
+# Configurar interfaz wlan0 (NetworkManager ya excluido en /etc/NetworkManager/conf.d/)
 ExecStart=/sbin/ip addr flush dev wlan0
 ExecStart=/sbin/ip addr add 192.168.50.1/24 dev wlan0
 ExecStart=/sbin/ip link set wlan0 up
+
+# Verificar que quedó UP
+ExecStartPost=/bin/sh -c 'sleep 1 && ip link show wlan0 | grep -q "state UP"'
 
 [Install]
 WantedBy=multi-user.target
