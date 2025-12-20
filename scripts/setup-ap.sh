@@ -127,41 +127,76 @@ echo "   ✅ dnsmasq configurado"
 echo "   📡 DHCP Range: 192.168.50.10 - 192.168.50.100"
 
 echo ""
-echo "6️⃣  Habilitando IP forwarding..."
-sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+echo "6️⃣  Habilitando IP forwarding (CRÍTICO para routing)..."
+# Activar inmediatamente
 echo 1 > /proc/sys/net/ipv4/ip_forward
-echo "   ✅ IP forwarding activado"
+
+# Hacer persistente
+if ! grep -q "^net.ipv4.ip_forward=1" /etc/sysctl.conf; then
+  # Descomentar si existe
+  sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+  
+  # Agregar si no existe
+  if ! grep -q "net.ipv4.ip_forward=1" /etc/sysctl.conf; then
+    echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+  fi
+fi
+
+sysctl -p > /dev/null 2>&1
+echo "   ✅ IP forwarding habilitado y persistente"
 
 echo ""
-echo "7️⃣  Configurando NAT/firewall..."
+echo "7️⃣  Configurando NAT/Firewall (LOS 3 PILARES DEL ROUTING)..."
 
-# Asegurar que las reglas de firewall incluyen wlan0
+# PILAR 1: Política FORWARD permisiva (por defecto DROP bloquea todo)
+iptables -P FORWARD ACCEPT
+echo "   ✅ Política FORWARD: ACCEPT"
+
+# PILAR 2: Reglas FORWARD explícitas (wlan0 → WAN)
+echo "   🔧 Configurando reglas FORWARD..."
+
+# Permitir wlan0 → eth0 (salida por Ethernet)
+iptables -C FORWARD -i wlan0 -o eth0 -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
+
+# Permitir wlan0 → usb0 (salida por LTE)
+iptables -C FORWARD -i wlan0 -o usb0 -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i wlan0 -o usb0 -j ACCEPT
+
+# Permitir respuestas: WAN → wlan0 (RELATED,ESTABLISHED)
+iptables -C FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+iptables -C FORWARD -i usb0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i usb0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+echo "   ✅ Reglas FORWARD configuradas"
+
+# PILAR 3: NAT/MASQUERADE (reescribir IP origen para salida a Internet)
+echo "   🔧 Configurando NAT/MASQUERADE..."
+
+# NAT genérico (todo tráfico saliente por eth0/usb0)
 iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || \
   iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 
 iptables -t nat -C POSTROUTING -o usb0 -j MASQUERADE 2>/dev/null || \
   iptables -t nat -A POSTROUTING -o usb0 -j MASQUERADE
 
-# Agregar reglas específicas para la red WiFi 192.168.50.0/24
+# NAT específico para red WiFi (192.168.50.0/24)
 iptables -t nat -C POSTROUTING -s 192.168.50.0/24 -o eth0 -j MASQUERADE 2>/dev/null || \
   iptables -t nat -A POSTROUTING -s 192.168.50.0/24 -o eth0 -j MASQUERADE
 
 iptables -t nat -C POSTROUTING -s 192.168.50.0/24 -o usb0 -j MASQUERADE 2>/dev/null || \
   iptables -t nat -A POSTROUTING -s 192.168.50.0/24 -o usb0 -j MASQUERADE
 
-iptables -C FORWARD -i wlan0 -o eth0 -j ACCEPT 2>/dev/null || \
-  iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
-
-iptables -C FORWARD -i wlan0 -o usb0 -j ACCEPT 2>/dev/null || \
-  iptables -A FORWARD -i wlan0 -o usb0 -j ACCEPT
-
-iptables -C FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
-  iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+echo "   ✅ NAT/MASQUERADE configurado"
 
 # Guardar reglas con iptables-save
 iptables-save > /etc/iptables.rules
+echo "   ✅ Reglas guardadas en /etc/iptables.rules"
 
 # Asegurar que se cargan al arranque
+mkdir -p /etc/network/if-pre-up.d
 if [ ! -f /etc/network/if-pre-up.d/iptables ]; then
   cat > /etc/network/if-pre-up.d/iptables << 'EOF'
 #!/bin/sh

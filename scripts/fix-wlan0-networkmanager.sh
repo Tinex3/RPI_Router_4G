@@ -33,16 +33,65 @@ ip link set wlan0 up
 echo "   ✅ IP 192.168.50.1/24 asignada"
 
 echo ""
-echo "4️⃣  Agregando reglas iptables específicas para WiFi..."
+echo "4️⃣  Configurando los 3 pilares del routing (IP forwarding + FORWARD + NAT)..."
+echo ""
+
+# PILAR 1: IP Forwarding (OBLIGATORIO)
+echo "   🔧 PILAR 1: IP Forwarding..."
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+# Hacer persistente
+if ! grep -q "^net.ipv4.ip_forward=1" /etc/sysctl.conf; then
+  sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+  if ! grep -q "net.ipv4.ip_forward=1" /etc/sysctl.conf; then
+    echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+  fi
+fi
+sysctl -p > /dev/null 2>&1
+echo "   ✅ IP forwarding habilitado y persistente"
+
+# PILAR 2: Reglas FORWARD (permitir tráfico entre interfaces)
+echo "   🔧 PILAR 2: Reglas FORWARD..."
+iptables -P FORWARD ACCEPT
+
+# wlan0 → WAN (salida)
+iptables -C FORWARD -i wlan0 -o eth0 -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
+
+iptables -C FORWARD -i wlan0 -o usb0 -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i wlan0 -o usb0 -j ACCEPT
+
+# WAN → wlan0 (respuestas)
+iptables -C FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+iptables -C FORWARD -i usb0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i usb0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+echo "   ✅ Reglas FORWARD configuradas"
+
+# PILAR 3: NAT/MASQUERADE (reescribir IPs para Internet)
+echo "   🔧 PILAR 3: NAT/MASQUERADE..."
+
+# NAT genérico
+iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || \
+  iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+
+iptables -t nat -C POSTROUTING -o usb0 -j MASQUERADE 2>/dev/null || \
+  iptables -t nat -A POSTROUTING -o usb0 -j MASQUERADE
+
+# NAT específico para WiFi
 iptables -t nat -C POSTROUTING -s 192.168.50.0/24 -o eth0 -j MASQUERADE 2>/dev/null || \
   iptables -t nat -A POSTROUTING -s 192.168.50.0/24 -o eth0 -j MASQUERADE
 
 iptables -t nat -C POSTROUTING -s 192.168.50.0/24 -o usb0 -j MASQUERADE 2>/dev/null || \
   iptables -t nat -A POSTROUTING -s 192.168.50.0/24 -o usb0 -j MASQUERADE
 
+echo "   ✅ NAT/MASQUERADE configurado"
+
 # Guardar reglas
 iptables-save > /etc/iptables.rules
-echo "   ✅ Reglas iptables configuradas y guardadas"
+echo "   💾 Reglas iptables guardadas"
 
 echo ""
 echo "5️⃣  Desmascando y habilitando hostapd..."
@@ -89,7 +138,40 @@ else
 fi
 
 echo ""
-echo "8️⃣  Información de la red WiFi:"
+echo "8️⃣  Pruebas de conectividad..."
+echo ""
+
+# Verificar IP forwarding
+if [ "$(cat /proc/sys/net/ipv4/ip_forward)" = "1" ]; then
+  echo "   ✅ IP forwarding: Habilitado"
+else
+  echo "   ❌ IP forwarding: Deshabilitado"
+fi
+
+# Verificar FORWARD policy
+FORWARD_POLICY=$(iptables -L FORWARD -n | grep "^Chain FORWARD" | awk '{print $4}' | tr -d ')')
+if [ "$FORWARD_POLICY" = "ACCEPT" ]; then
+  echo "   ✅ Política FORWARD: ACCEPT"
+else
+  echo   iptables -t nat -L POSTROUTING -n -v"
+echo "   iptables -L FORWARD -n -v"
+echo ""
+echo "📱 Pasos para probar:"
+echo "   1. Conectar teléfono a 'RPI_Router_4G'"
+echo "   2. Verificar que recibe IP 192.168.50.x"
+echo "   3. Hacer ping 8.8.8.8 (debe funcionar)"
+echo "   4. Abrir navegador y buscar google.com
+
+# Verificar NAT
+NAT_COUNT=$(iptables -t nat -L POSTROUTING -n | grep "MASQUERADE" | wc -l)
+if [ "$NAT_COUNT" -gt 0 ]; then
+  echo "   ✅ Reglas NAT: $NAT_COUNT reglas MASQUERADE activas"
+else
+  echo "   ❌ Reglas NAT: No encontradas"
+fi
+
+echo ""
+echo "9️⃣  Información de la red WiFi:"
 echo ""
 echo "   SSID: RPI_Router_4G"
 echo "   Password: router4g2024"
