@@ -261,3 +261,68 @@ label{display:block;margin:10px 0 6px;color:var(--muted);font-size:.92rem}
   font-family: 'Courier New', monospace;
   font-size: 0.9rem;
 }
+
+/* Password wrapper */
+.password-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.password-wrapper .input {
+  flex: 1;
+}
+
+.btn-icon {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.btn-icon:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+/* Hint text */
+.hint {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+/* Status messages */
+.status-msg {
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-top: 12px;
+  font-size: 0.9rem;
+}
+
+.status-msg.success {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.status-msg.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.status-msg.info {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* HR separator */
+.hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 20px 0;
+}
