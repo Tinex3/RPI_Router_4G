@@ -94,13 +94,72 @@ iptables-save > /etc/iptables.rules
 echo "   💾 Reglas iptables guardadas"
 
 echo ""
-echo "5️⃣  Desmascando y habilitando hostapd..."
-systemctl unmask hostapd
-systemctl enable hostapd
-echo "   ✅ hostapd habilitado"
+echo "5️⃣  Verificando y creando servicios systemd si faltan..."
+
+# Verificar si hostapd.service existe
+if [ ! -f /lib/systemd/system/hostapd.service ] && [ ! -f /etc/systemd/system/hostapd.service ]; then
+  echo "   ⚠️  hostapd.service no existe, creando..."
+  
+  cat > /etc/systemd/system/hostapd.service << 'EOF'
+[Unit]
+Description=Access point and authentication server for Wi-Fi and Ethernet
+After=network.target wlan0-ap.service
+
+[Service]
+Type=forking
+PIDFile=/run/hostapd.pid
+Restart=on-failure
+RestartSec=2
+Environment=DAEMON_CONF=/etc/hostapd/hostapd.conf
+ExecStart=/usr/sbin/hostapd -B -P /run/hostapd.pid $DAEMON_CONF
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  
+  systemctl daemon-reload
+  echo "   ✅ hostapd.service creado"
+fi
+
+# Verificar si dnsmasq.service existe
+if [ ! -f /lib/systemd/system/dnsmasq.service ] && [ ! -f /etc/systemd/system/dnsmasq.service ]; then
+  echo "   ⚠️  dnsmasq.service no existe, creando..."
+  
+  cat > /etc/systemd/system/dnsmasq.service << 'EOF'
+[Unit]
+Description=dnsmasq - A lightweight DHCP and caching DNS server
+After=network.target
+Before=network-online.target
+
+[Service]
+Type=forking
+PIDFile=/run/dnsmasq/dnsmasq.pid
+ExecStartPre=/usr/sbin/dnsmasq --test
+ExecStart=/usr/sbin/dnsmasq -x /run/dnsmasq/dnsmasq.pid -u dnsmasq -7 /etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new --local-service
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  
+  mkdir -p /run/dnsmasq
+  chown dnsmasq:nogroup /run/dnsmasq 2>/dev/null || true
+  
+  systemctl daemon-reload
+  echo "   ✅ dnsmasq.service creado"
+fi
 
 echo ""
-echo "6️⃣  Reiniciando servicios WiFi AP..."
+echo "6️⃣  Desmascando y habilitando servicios..."
+systemctl unmask hostapd
+systemctl enable hostapd
+systemctl enable dnsmasq
+echo "   ✅ Servicios habilitados"
+
+echo ""
+echo "7️⃣  Reiniciando servicios WiFi AP..."
 systemctl restart wlan0-ap.service
 sleep 2
 systemctl restart hostapd
@@ -109,7 +168,7 @@ systemctl restart dnsmasq
 echo "   ✅ Servicios WiFi reiniciados"
 
 echo ""
-echo "7️⃣  Verificando estado final..."
+echo "8️⃣  Verificando estado final..."
 echo ""
 
 # Estado wlan0
@@ -165,7 +224,7 @@ else
 fi
 
 echo ""
-echo "9️⃣  Información de la red WiFi:"
+echo "🔟 Información de la red WiFi:"
 echo ""
 echo "   SSID: RPI_Router_4G"
 echo "   Password: router4g2024"
