@@ -669,6 +669,7 @@ def update_docker_compose(config):
     restart: unless-stopped
     privileged: true
     network_mode: host
+    pull_policy: always
     environment:
       # Configuracion del chip LoRa
       CLKSRC: 1
@@ -683,7 +684,7 @@ def update_docker_compose(config):
       # Configuracion GPIO
       USE_LIBGPIO: 1
       GPIO_CHIP: "gpiochip0"
-      RESET_GPIO: "17"
+      RESET_GPIO: "23"
       
       # Modelo del concentrador
       MODEL: "SX1302"
