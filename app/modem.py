@@ -4,11 +4,22 @@ import logging
 BAUDRATE = 115200
 logger = logging.getLogger(__name__)
 
-def find_at_port():
+# Cache del puerto AT (evita búsquedas constantes)
+_cached_port = None
+_cache_time = 0
+CACHE_DURATION = 30  # segundos
+
+def find_at_port(force_refresh=False):
     """Busca puerto AT del módem EC25 automáticamente"""
+    global _cached_port, _cache_time
+    
+    # Usar cache si existe y es reciente
+    if not force_refresh and _cached_port and (time.time() - _cache_time < CACHE_DURATION):
+        return _cached_port
+    
     for p in sorted(glob.glob("/dev/ttyUSB*")):
         try:
-            logger.info(f"Probando puerto AT: {p}")
+            logger.debug(f"Probando puerto AT: {p}")
             with serial.Serial(p, BAUDRATE, timeout=2, rtscts=False, dsrdtr=False) as s:
                 # Limpiar buffer
                 s.reset_input_buffer()
@@ -27,13 +38,17 @@ def find_at_port():
                         break
                     time.sleep(0.2)
                 
-                logger.info(f"Puerto {p} responde: {repr(response[:150])}")
+                logger.debug(f"Puerto {p} responde: {repr(response[:150])}")
                 if "OK" in response:
-                    logger.info(f"✅ Puerto AT encontrado: {p}")
+                    logger.info(f"✅ Puerto AT encontrado y cacheado: {p}")
+                    _cached_port = p
+                    _cache_time = time.time()
                     return p
         except Exception as e:
-            logger.warning(f"Puerto {p} error: {e}")
-    logger.error("❌ No se encontró puerto AT del modem en ningún /dev/ttyUSB*")
+            logger.debug(f"Puerto {p} error: {e}")
+    
+    logger.warning("❌ No se encontró puerto AT del modem")
+    _cached_port = None
     return None
 
 def send_at(cmd: str) -> str | None:
