@@ -6,18 +6,20 @@ logger = logging.getLogger(__name__)
 
 def find_at_port():
     """Busca puerto AT del módem EC25 automáticamente"""
-    for p in glob.glob("/dev/ttyUSB*"):
+    for p in sorted(glob.glob("/dev/ttyUSB*")):
         try:
             logger.info(f"Probando puerto AT: {p}")
-            with serial.Serial(p, BAUDRATE, timeout=1) as s:
-                s.write(b"AT\r")
-                response = s.read(32).decode(errors="ignore")
+            with serial.Serial(p, BAUDRATE, timeout=3, rtscts=False, dsrdtr=False) as s:
+                s.write(b"AT\r\n")
+                time.sleep(0.5)
+                response = s.read(256).decode(errors="ignore")
+                logger.info(f"Puerto {p} responde: {repr(response[:100])}")
                 if "OK" in response:
-                    logger.info(f"Puerto AT encontrado: {p}")
+                    logger.info(f"✅ Puerto AT encontrado: {p}")
                     return p
         except Exception as e:
-            logger.debug(f"Puerto {p} no responde: {e}")
-    logger.warning("No se encontró puerto AT del modem")
+            logger.warning(f"Puerto {p} error: {e}")
+    logger.error("❌ No se encontró puerto AT del modem en ningún /dev/ttyUSB*")
     return None
 
 def send_at(cmd: str) -> str | None:
