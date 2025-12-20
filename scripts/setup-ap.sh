@@ -319,7 +319,6 @@ EOF
 
 systemctl daemon-reload
 echo "   [OK] Servicio dnsmasq.service configurado"
-fi
 
 systemctl enable dnsmasq
 
