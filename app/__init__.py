@@ -3,9 +3,16 @@ from flask_login import LoginManager
 from .web import web
 from .auth import get_user, ensure_password_hash
 from .logging_config import setup_logging
+import os
 
 def create_app() -> Flask:
-    app = Flask(__name__)
+    # Detecta el directorio base del proyecto (donde está run.py)
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    
+    # Flask usa rutas absolutas para templates y static
+    app = Flask(__name__,
+                template_folder=os.path.join(base_dir, 'templates'),
+                static_folder=os.path.join(base_dir, 'static'))
     app.secret_key = "change-this-secret-in-prod-ec25-router"
 
     # Setup logging rotativo
