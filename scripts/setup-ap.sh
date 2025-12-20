@@ -259,7 +259,35 @@ systemctl enable wlan0-ap.service
 
 echo "   ✅ Servicio wlan0-ap habilitado"
 
-systemctl unmask hostapd
+# Verificar si hostapd.service existe
+if [ ! -f /lib/systemd/system/hostapd.service ] && [ ! -f /etc/systemd/system/hostapd.service ]; then
+  echo "   ⚠️  hostapd.service no existe, creando servicio systemd..."
+  
+  # Crear servicio hostapd manualmente
+  cat > /etc/systemd/system/hostapd.service << 'EOF'
+[Unit]
+Description=Access point and authentication server for Wi-Fi and Ethernet
+After=network.target
+Before=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+PIDFile=/run/hostapd.pid
+Restart=on-failure
+RestartSec=2
+Environment=DAEMON_CONF=/etc/hostapd/hostapd.conf
+ExecStart=/usr/sbin/hostapd -B -P /run/hostapd.pid $DAEMON_CONF
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  
+  systemctl daemon-reload
+  echo "   ✅ Servicio hostapd.service creado"
+fi
+
+systemctl unmask hostapd 2>/dev/null || true
 systemctl enable hostapd
 systemctl enable dnsmasq
 
