@@ -349,7 +349,7 @@ fi
 # Verificar hostapd
 if systemctl is-active --quiet hostapd; then
   if journalctl -u hostapd -n 5 | grep -q "AP-ENABLED"; then
-    echo "   ✅ hostapd: RUNNING (AP activado)"
+    echo "   ✅ hostapd: RUNNING - AP activado"
   else
     echo "   ⚠️  hostapd: Running pero sin confirmar AP-ENABLED"
   fi
