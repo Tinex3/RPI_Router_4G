@@ -648,8 +648,16 @@ TC_KEY={tc_key}
 HAS_GPS={has_gps}
 """.format(**config)
         
-        with open(BASICSTATION_ENV, "w") as f:
+        # Escribir en archivo temporal y mover con sudo
+        temp_file = "/tmp/basicstation.env.tmp"
+        with open(temp_file, "w") as f:
             f.write(content)
+        
+        subprocess.run(
+            ["sudo", "mv", temp_file, BASICSTATION_ENV],
+            check=True,
+            timeout=5
+        )
         
         # Actualizar docker-compose.yml con los valores
         update_docker_compose(config)
@@ -698,8 +706,16 @@ def update_docker_compose(config):
       TC_KEY: "{tc_key}"
 """.format(**config)
     
-    with open(BASICSTATION_COMPOSE, "w") as f:
+    # Escribir usando sudo porque /opt requiere permisos elevados
+    temp_file = "/tmp/docker-compose.yml.tmp"
+    with open(temp_file, "w") as f:
         f.write(compose_content)
+    
+    subprocess.run(
+        ["sudo", "mv", temp_file, BASICSTATION_COMPOSE],
+        check=True,
+        timeout=5
+    )
 
 
 @web.route("/gateway")
@@ -1029,6 +1045,26 @@ def api_gateway_config_post():
         
         if save_gateway_config(config):
             logging.info("Gateway config updated by %s", current_user.username)
+            
+            # Reiniciar contenedor si está corriendo para aplicar cambios
+            try:
+                result = subprocess.run(
+                    ["sudo", "docker", "ps", "-q", "-f", "name=basicstation"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.stdout.strip():
+                    # Contenedor está corriendo, reiniciarlo
+                    subprocess.run(
+                        ["sudo", "docker", "restart", "basicstation"],
+                        capture_output=True,
+                        timeout=30
+                    )
+                    logging.info("BasicStation container restarted to apply new config")
+            except Exception as e:
+                logging.warning("Could not restart container: %s", e)
+            
             return jsonify({"success": True})
         else:
             return jsonify({"success": False, "error": "Error guardando configuracion"})
