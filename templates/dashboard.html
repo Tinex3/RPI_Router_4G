@@ -51,6 +51,34 @@
     </div>
     <button class="btn danger" onclick="resetModem()" style="margin-top: 16px; width: 100%;">🔄 Reiniciar Módem</button>
   </div>
+
+  <div class="card">
+    <h2>⚡ Velocidad</h2>
+    <div id="speedtestResult" style="display:none;">
+      <div class="info-list">
+        <div class="info-item">
+          <span class="label">📥 Descarga:</span>
+          <span id="downloadSpeed" class="value speed-value">–</span>
+        </div>
+        <div class="info-item">
+          <span class="label">📤 Subida:</span>
+          <span id="uploadSpeed" class="value speed-value">–</span>
+        </div>
+        <div class="info-item">
+          <span class="label">⏱️ Ping:</span>
+          <span id="pingValue" class="value">–</span>
+        </div>
+        <div class="info-item" style="border:none;">
+          <span class="label">🌍 Servidor:</span>
+          <span id="serverInfo" class="value" style="font-size:.85rem;">–</span>
+        </div>
+      </div>
+    </div>
+    <div id="speedtestStatus" style="text-align:center; color:var(--muted); margin:20px 0;">
+      Presiona el botón para iniciar
+    </div>
+    <button id="speedtestBtn" class="btn" onclick="runSpeedtest()" style="width: 100%;">🚀 Iniciar Test</button>
+  </div>
 </div>
 
 <script src="/static/js/dashboard.js"></script>

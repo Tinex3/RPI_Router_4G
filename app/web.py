@@ -6,6 +6,7 @@ from .modem import get_network_info, get_signal, set_apn, reset_modem
 from .config import load_config, save_config
 from .network import active_wan
 from .firewall import apply_firewall
+from .speedtest import run_speedtest
 
 web = Blueprint("web", __name__)
 
@@ -105,3 +106,11 @@ def api_security():
     except Exception as e:
         logging.error("Error applying firewall: %s", e)
         return jsonify({"ok": False, "error": str(e)}), 500
+
+@web.route("/api/speedtest", methods=["POST"])
+@login_required
+def api_speedtest():
+    """Ejecuta test de velocidad (puede tardar 30-60 segundos)"""
+    logging.info("Speedtest iniciado por %s", current_user.username)
+    result = run_speedtest()
+    return jsonify(result)

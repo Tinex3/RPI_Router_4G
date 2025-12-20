@@ -75,5 +75,39 @@ async function resetModem(){
   }
 }
 
+async function runSpeedtest() {
+  const btn = document.getElementById("speedtestBtn");
+  const status = document.getElementById("speedtestStatus");
+  const result = document.getElementById("speedtestResult");
+  
+  btn.disabled = true;
+  btn.textContent = "⏳ Ejecutando...";
+  status.textContent = "Probando velocidad... Esto puede tomar 30-60 segundos";
+  result.style.display = "none";
+  
+  try {
+    const response = await fetch("/api/speedtest", {method: "POST"});
+    const data = await response.json();
+    
+    if (data.success) {
+      // Mostrar resultados
+      document.getElementById("downloadSpeed").textContent = `${data.download} Mbps`;
+      document.getElementById("uploadSpeed").textContent = `${data.upload} Mbps`;
+      document.getElementById("pingValue").textContent = `${data.ping} ms`;
+      document.getElementById("serverInfo").textContent = `${data.server.name} (${data.server.country})`;
+      
+      result.style.display = "block";
+      status.textContent = "✅ Test completado";
+    } else {
+      status.textContent = `❌ Error: ${data.error}`;
+    }
+  } catch (e) {
+    status.textContent = "❌ Error ejecutando speedtest";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🚀 Iniciar Test";
+  }
+}
+
 setInterval(load, 5000);
 load();
