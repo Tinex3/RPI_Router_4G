@@ -153,14 +153,8 @@ FORWARD_POLICY=$(iptables -L FORWARD -n | grep "^Chain FORWARD" | awk '{print $4
 if [ "$FORWARD_POLICY" = "ACCEPT" ]; then
   echo "   ✅ Política FORWARD: ACCEPT"
 else
-  echo   iptables -t nat -L POSTROUTING -n -v"
-echo "   iptables -L FORWARD -n -v"
-echo ""
-echo "📱 Pasos para probar:"
-echo "   1. Conectar teléfono a 'RPI_Router_4G'"
-echo "   2. Verificar que recibe IP 192.168.50.x"
-echo "   3. Hacer ping 8.8.8.8 (debe funcionar)"
-echo "   4. Abrir navegador y buscar google.com
+  echo "   ⚠️  Política FORWARD: $FORWARD_POLICY"
+fi
 
 # Verificar NAT
 NAT_COUNT=$(iptables -t nat -L POSTROUTING -n | grep "MASQUERADE" | wc -l)
@@ -186,6 +180,12 @@ echo "🔍 Verificar con:"
 echo "   ip addr show wlan0"
 echo "   sudo journalctl -u hostapd -n 10"
 echo "   iw dev wlan0 info"
+echo "   iptables -t nat -L POSTROUTING -n -v"
+echo "   iptables -L FORWARD -n -v"
 echo ""
-echo "📱 Buscar red WiFi 'RPI_Router_4G' desde tu teléfono"
+echo "📱 Pasos para probar:"
+echo "   1. Conectar teléfono a red RPI_Router_4G"
+echo "   2. Verificar que recibe IP 192.168.50.x"
+echo "   3. Hacer ping a 8.8.8.8 - debe funcionar"
+echo "   4. Abrir navegador y buscar google.com"
 echo ""
