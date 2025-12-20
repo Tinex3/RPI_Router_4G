@@ -1,30 +1,40 @@
 import serial, glob, time
+import logging
 
 BAUDRATE = 115200
+logger = logging.getLogger(__name__)
 
 def find_at_port():
     """Busca puerto AT del módem EC25 automáticamente"""
     for p in glob.glob("/dev/ttyUSB*"):
         try:
+            logger.info(f"Probando puerto AT: {p}")
             with serial.Serial(p, BAUDRATE, timeout=1) as s:
                 s.write(b"AT\r")
-                if "OK" in s.read(32).decode(errors="ignore"):
+                response = s.read(32).decode(errors="ignore")
+                if "OK" in response:
+                    logger.info(f"Puerto AT encontrado: {p}")
                     return p
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Puerto {p} no responde: {e}")
+    logger.warning("No se encontró puerto AT del modem")
     return None
 
 def send_at(cmd: str) -> str | None:
     """Envía comando AT y retorna respuesta"""
     port = find_at_port()
     if not port:
+        logger.error("No hay puerto AT disponible")
         return None
     try:
         with serial.Serial(port, BAUDRATE, timeout=2) as s:
             s.write((cmd + "\r").encode())
             time.sleep(0.4)
-            return s.read(512).decode(errors="ignore")
+            response = s.read(512).decode(errors="ignore")
+            logger.debug(f"AT command {cmd}: {response[:50]}...")
+            return response
     except Exception as e:
+        logger.error(f"Error enviando comando AT {cmd}: {e}")
         return f"Error: {e}"
 
 def get_signal():
