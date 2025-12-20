@@ -88,21 +88,107 @@ def send_at(cmd: str) -> str | None:
         logger.error(f"Error enviando comando AT {cmd}: {e}")
         return None
 
+def parse_csq(response):
+    """Parsea +CSQ: rssi,ber"""
+    if not response:
+        return None
+    import re
+    match = re.search(r'\+CSQ:\s*(\d+),(\d+)', response)
+    if match:
+        rssi, ber = int(match.group(1)), int(match.group(2))
+        # Convertir a dBm: -113 + (rssi * 2)
+        dbm = -113 + (rssi * 2) if rssi < 31 else "Desconocido"
+        return f"{rssi}/31 ({dbm} dBm)" if isinstance(dbm, int) else f"{rssi}/31"
+    return None
+
+def parse_qcsq(response):
+    """Parsea +QCSQ: type,rssi,rsrp,sinr,rsrq"""
+    if not response:
+        return None
+    import re
+    match = re.search(r'\+QCSQ:\s*"([^"]+)",(-?\d+),(-?\d+),(-?\d+),(-?\d+)', response)
+    if match:
+        tech, rssi, rsrp, sinr, rsrq = match.groups()
+        return f"{tech}: RSRP {rsrp}dBm, RSRQ {rsrq}dB, SINR {sinr}dB"
+    return None
+
+def parse_cops(response):
+    """Parsea +COPS: mode,format,operator,act"""
+    if not response:
+        return None
+    import re
+    match = re.search(r'\+COPS:\s*\d+,\d+,"([^"]+)",(\d+)', response)
+    if match:
+        operator, act = match.groups()
+        tech_map = {"0": "GSM", "2": "UTRAN", "7": "LTE", "9": "NB-IoT"}
+        return f"{operator} ({tech_map.get(act, 'Unknown')})"
+    return None
+
+def parse_qnwinfo(response):
+    """Parsea +QNWINFO: act,mcc-mnc,band,channel"""
+    if not response:
+        return None
+    import re
+    match = re.search(r'\+QNWINFO:\s*"([^"]+)","([^"]+)","([^"]+)",(\d+)', response)
+    if match:
+        act, mcc_mnc, band, channel = match.groups()
+        return f"{act} - {band} @ {channel} MHz"
+    return None
+
+def parse_reg_status(response):
+    """Parsea +CREG/+CEREG: n,stat"""
+    if not response:
+        return None
+    import re
+    match = re.search(r'\+(C?[ER]REG):\s*\d+,(\d+)', response)
+    if match:
+        reg_type, stat = match.groups()
+        status_map = {"0": "No registrado", "1": "Registrado", "2": "Buscando", "3": "Denegado", "5": "Roaming"}
+        return status_map.get(stat, f"Estado {stat}")
+    return None
+
+def parse_cpin(response):
+    """Parsea +CPIN: status"""
+    if not response:
+        return None
+    import re
+    match = re.search(r'\+CPIN:\s*(\w+)', response)
+    if match:
+        status = match.group(1)
+        status_map = {"READY": "Lista", "SIM PIN": "PIN requerido", "SIM PUK": "PUK requerido"}
+        return status_map.get(status, status)
+    return None
+
 def get_signal():
-    """Obtiene señal CSQ y QCSQ"""
+    """Obtiene señal CSQ y QCSQ parseada"""
+    csq_raw = send_at("AT+CSQ")
+    qcsq_raw = send_at("AT+QCSQ")
     return {
-        "csq": send_at("AT+CSQ"),
-        "qcsq": send_at("AT+QCSQ")
+        "csq": parse_csq(csq_raw) or "N/A",
+        "csq_raw": csq_raw,
+        "qcsq": parse_qcsq(qcsq_raw) or "N/A",
+        "qcsq_raw": qcsq_raw
     }
 
 def get_network_info():
     """Obtiene info completa: operador, tecnología, registro, SIM"""
+    cops_raw = send_at("AT+COPS?")
+    qnwinfo_raw = send_at("AT+QNWINFO")
+    creg_raw = send_at("AT+CREG?")
+    cereg_raw = send_at("AT+CEREG?")
+    cpin_raw = send_at("AT+CPIN?")
+    
     return {
-        "cops": send_at("AT+COPS?"),
-        "qnwinfo": send_at("AT+QNWINFO"),
-        "creg": send_at("AT+CREG?"),
-        "cereg": send_at("AT+CEREG?"),
-        "cpin": send_at("AT+CPIN?")
+        "operator": parse_cops(cops_raw) or "N/A",
+        "network": parse_qnwinfo(qnwinfo_raw) or "N/A",
+        "registration": parse_reg_status(cereg_raw or creg_raw) or "N/A",
+        "sim": parse_cpin(cpin_raw) or "N/A",
+        # Raw para debugging
+        "cops_raw": cops_raw,
+        "qnwinfo_raw": qnwinfo_raw,
+        "creg_raw": creg_raw,
+        "cereg_raw": cereg_raw,
+        "cpin_raw": cpin_raw
     }
 
 def set_apn(apn: str):
