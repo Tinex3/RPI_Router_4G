@@ -122,6 +122,23 @@ for service in wan-manager watchdog ec25-router; do
 done
 
 echo ""
+echo "🔟 Configurando WiFi Access Point..."
+echo ""
+read -p "¿Deseas configurar el Access Point WiFi ahora? (y/n) " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  if [ -f "$INSTALL_DIR/scripts/setup-ap.sh" ]; then
+    sudo bash "$INSTALL_DIR/scripts/setup-ap.sh"
+  else
+    echo "   ⚠️  Script setup-ap.sh no encontrado, puedes ejecutarlo manualmente después:"
+    echo "      sudo bash $INSTALL_DIR/scripts/setup-ap.sh"
+  fi
+else
+  echo "   ℹ️  Puedes configurar el WiFi AP más tarde con:"
+  echo "      sudo bash $INSTALL_DIR/scripts/setup-ap.sh"
+fi
+
+echo ""
 echo "╔════════════════════════════════════════════════════════════════════╗"
 echo "║                  ✅ INSTALACIÓN COMPLETADA                        ║"
 echo "╚════════════════════════════════════════════════════════════════════╝"

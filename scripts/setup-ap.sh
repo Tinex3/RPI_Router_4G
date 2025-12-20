@@ -132,6 +132,13 @@ iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || \
 iptables -t nat -C POSTROUTING -o usb0 -j MASQUERADE 2>/dev/null || \
   iptables -t nat -A POSTROUTING -o usb0 -j MASQUERADE
 
+# Agregar reglas específicas para la red WiFi 192.168.50.0/24
+iptables -t nat -C POSTROUTING -s 192.168.50.0/24 -o eth0 -j MASQUERADE 2>/dev/null || \
+  iptables -t nat -A POSTROUTING -s 192.168.50.0/24 -o eth0 -j MASQUERADE
+
+iptables -t nat -C POSTROUTING -s 192.168.50.0/24 -o usb0 -j MASQUERADE 2>/dev/null || \
+  iptables -t nat -A POSTROUTING -s 192.168.50.0/24 -o usb0 -j MASQUERADE
+
 iptables -C FORWARD -i wlan0 -o eth0 -j ACCEPT 2>/dev/null || \
   iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
 
@@ -141,12 +148,35 @@ iptables -C FORWARD -i wlan0 -o usb0 -j ACCEPT 2>/dev/null || \
 iptables -C FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
   iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
 
-# Guardar reglas
-netfilter-persistent save
-echo "   ✅ Firewall configurado"
+# Guardar reglas con iptables-save
+iptables-save > /etc/iptables.rules
+
+# Asegurar que se cargan al arranque
+if [ ! -f /etc/network/if-pre-up.d/iptables ]; then
+  cat > /etc/network/if-pre-up.d/iptables << 'EOF'
+#!/bin/sh
+/sbin/iptables-restore < /etc/iptables.rules
+EOF
+  chmod +x /etc/network/if-pre-up.d/iptables
+  echo "   ✅ Script de restauración iptables creado"
+fi
+
+# También intentar con netfilter-persistent si está disponible
+if command -v netfilter-persistent &> /dev/null; then
+  netfilter-persistent save
+  echo "   ✅ Reglas guardadas con netfilter-persistent"
+fi
+
+echo "   ✅ Firewall configurado y persistente"
 
 echo ""
-echo "8️⃣  Configurando inicio automático..."
+echo "8️⃣  Deteniendo ModemManager (puede interferir con WiFi)..."
+systemctl stop ModemManager 2>/dev/null || true
+systemctl disable ModemManager 2>/dev/null || true
+echo "   ✅ ModemManager deshabilitado"
+
+echo ""
+echo "9️⃣  Configurando inicio automático..."
 
 # Instalar servicio de configuración wlan0
 cp "$SCRIPT_DIR/../systemd/wlan0-ap.service" /etc/systemd/system/
@@ -163,23 +193,30 @@ echo "   ✅ hostapd y dnsmasq habilitados para arranque automático"
 
 # Iniciar servicio wlan0-ap primero
 systemctl start wlan0-ap.service
-sleep 1
-
-# Iniciar servicios AP
-systemctl restart hostapd
-systemctl restart dnsmasq
-
-echo ""
-echo "9️⃣  Verificando estado..."
+sleep 2
+🔟 Verificando estado..."
 echo ""
 
+# Verificar wlan0
+if ip addr show wlan0 | grep -q "192.168.50.1"; then
+  echo "   ✅ wlan0: IP 192.168.50.1 asignada"
+else
+  echo "   ⚠️  wlan0: IP no configurada correctamente"
+fi
+
+# Verificar hostapd
 if systemctl is-active --quiet hostapd; then
-  echo "   ✅ hostapd: RUNNING"
+  if journalctl -u hostapd -n 5 | grep -q "AP-ENABLED"; then
+    echo "   ✅ hostapd: RUNNING (AP activado)"
+  else
+    echo "   ⚠️  hostapd: Running pero sin confirmar AP-ENABLED"
+  fi
 else
   echo "   ❌ hostapd: FAILED"
   echo "      Ver logs: sudo journalctl -u hostapd -n 20"
 fi
 
+# Verificar dnsmasq
 if systemctl is-active --quiet dnsmasq; then
   echo "   ✅ dnsmasq: RUNNING"
 else
@@ -187,8 +224,29 @@ else
   echo "      Ver logs: sudo journalctl -u dnsmasq -n 20"
 fi
 
+# Verificar iptables
+if iptables -t nat -L POSTROUTING -n | grep -q "192.168.50.0/24"; then
+  echo "   ✅ iptables: Reglas NAT configuradas"
+else
+  echo "   ⚠️  iptables: Reglas NAT podrían no estar completas"
+fi
+
 echo ""
 echo "╔════════════════════════════════════════════════════════════════════╗"
+echo "║              ✅ CONFIGURACIÓN COMPLETADA                          ║"
+echo "╚════════════════════════════════════════════════════════════════════╝"
+echo ""
+echo "📡 Red WiFi creada:"
+echo "   SSID: RPI_Router_4G"
+echo "   Password: router4g2024"
+echo "   IP Gateway: 192.168.50.1"
+echo "   DHCP Range: 192.168.50.10 - 192.168.50.100"
+echo ""
+echo "🔧 Comandos útiles:"
+echo "   Ver logs hostapd:  sudo journalctl -u hostapd -f"
+echo "   Reiniciar AP:      sudo systemctl restart wlan0-ap hostapd dnsmasq"
+echo "   Verificar wlan0:   iw dev wlan0 info"
+echo "   Ver clientes WiFi: iw dev wlan0 station dump════════════════════════╗"
 echo "║              ✅ CONFIGURACIÓN COMPLETADA                          ║"
 echo "╚════════════════════════════════════════════════════════════════════╝"
 echo ""
