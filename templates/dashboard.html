@@ -19,12 +19,62 @@
     <div id="signalStrength" class="signal-meter"></div>
     <div id="signalDetails" class="info-list">
       <div class="info-item">
-        <span class="label">CSQ:</span>
+        <span class="label tooltip-trigger">
+          CSQ:
+          <span class="tooltip">
+            <strong>Channel Signal Quality</strong><br>
+            Calidad básica de señal 2G/3G<br>
+            📊 Valores: 0-31 (mejor &gt; 20)<br>
+            📏 En dBm: -113 a -51 dBm
+          </span>
+        </span>
         <span id="csq" class="value">–</span>
       </div>
-      <div class="info-item">
-        <span class="label">Calidad:</span>
-        <span id="qcsq" class="value">–</span>
+      <div class="info-item" style="border: none; padding-bottom: 0;">
+        <span class="label" style="color: var(--primary); font-weight: 600;">Métricas LTE:</span>
+      </div>
+      <div class="info-item metric-detail">
+        <span class="label tooltip-trigger">
+          RSRP:
+          <span class="tooltip">
+            <strong>Reference Signal Received Power</strong><br>
+            Potencia de la señal LTE recibida<br>
+            ✅ Excelente: &gt; -80 dBm<br>
+            🟢 Buena: -80 a -90 dBm<br>
+            🟡 Regular: -90 a -100 dBm<br>
+            🟠 Débil: -100 a -110 dBm<br>
+            🔴 Muy débil: &lt; -110 dBm
+          </span>
+        </span>
+        <span id="rsrp" class="value">–</span>
+      </div>
+      <div class="info-item metric-detail">
+        <span class="label tooltip-trigger">
+          RSRQ:
+          <span class="tooltip">
+            <strong>Reference Signal Received Quality</strong><br>
+            Calidad de señal (interferencias)<br>
+            ✅ Excelente: &gt; -10 dB<br>
+            🟢 Buena: -10 a -15 dB<br>
+            🟡 Regular: -15 a -20 dB<br>
+            🔴 Mala: &lt; -20 dB
+          </span>
+        </span>
+        <span id="rsrq" class="value">–</span>
+      </div>
+      <div class="info-item metric-detail">
+        <span class="label tooltip-trigger">
+          SINR:
+          <span class="tooltip">
+            <strong>Signal to Interference + Noise Ratio</strong><br>
+            Relación señal/ruido+interferencia<br>
+            ✅ Excelente: &gt; 20 dB<br>
+            🟢 Buena: 13 a 20 dB<br>
+            🟡 Regular: 0 a 13 dB<br>
+            🔴 Mala: &lt; 0 dB
+          </span>
+        </span>
+        <span id="sinr" class="value">–</span>
       </div>
     </div>
   </div>
@@ -37,7 +87,17 @@
         <span id="operator" class="value">–</span>
       </div>
       <div class="info-item">
-        <span class="label">Red:</span>
+        <span class="label tooltip-trigger">
+          Red:
+          <span class="tooltip tooltip-left">
+            <strong>Tecnología y Banda</strong><br>
+            FDD = Frequency Division Duplex<br>
+            (subida y bajada en frecuencias separadas)<br><br>
+            Banda 7 @ 2600 MHz (América Latina)<br>
+            Banda 3 @ 1800 MHz (común en ciudades)<br>
+            Banda 28 @ 700 MHz (cobertura rural)
+          </span>
+        </span>
         <span id="network" class="value">–</span>
       </div>
       <div class="info-item">

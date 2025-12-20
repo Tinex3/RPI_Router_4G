@@ -17,14 +17,42 @@ async function load() {
   try {
     const sig = await (await fetch("/api/signal")).json();
     document.getElementById("csq").textContent = sig.csq || "N/A";
-    document.getElementById("qcsq").textContent = sig.qcsq || "N/A";
     
-    // Signal strength bar
+    // Parsear QCSQ para extraer métricas individuales
+    // Formato: "LTE: RSRP -100dBm, RSRQ -17dB, SINR 95dB"
+    if (sig.qcsq) {
+      const rsrpMatch = sig.qcsq.match(/RSRP\s+(-?\d+)dBm/);
+      const rsrqMatch = sig.qcsq.match(/RSRQ\s+(-?\d+)dB/);
+      const sinrMatch = sig.qcsq.match(/SINR\s+(-?\d+)dB/);
+      
+      if (rsrpMatch) {
+        const rsrp = parseInt(rsrpMatch[1]);
+        const rsrpColor = rsrp > -80 ? "#22c55e" : rsrp > -90 ? "#84cc16" : rsrp > -100 ? "#eab308" : rsrp > -110 ? "#f97316" : "#ef4444";
+        const rsrpIcon = rsrp > -80 ? "✅" : rsrp > -90 ? "🟢" : rsrp > -100 ? "🟡" : rsrp > -110 ? "🟠" : "🔴";
+        document.getElementById("rsrp").innerHTML = `<span style="color: ${rsrpColor}">${rsrpIcon} ${rsrp} dBm</span>`;
+      }
+      
+      if (rsrqMatch) {
+        const rsrq = parseInt(rsrqMatch[1]);
+        const rsrqColor = rsrq > -10 ? "#22c55e" : rsrq > -15 ? "#84cc16" : rsrq > -20 ? "#eab308" : "#ef4444";
+        const rsrqIcon = rsrq > -10 ? "✅" : rsrq > -15 ? "🟢" : rsrq > -20 ? "🟡" : "🔴";
+        document.getElementById("rsrq").innerHTML = `<span style="color: ${rsrqColor}">${rsrqIcon} ${rsrq} dB</span>`;
+      }
+      
+      if (sinrMatch) {
+        const sinr = parseInt(sinrMatch[1]);
+        const sinrColor = sinr > 20 ? "#22c55e" : sinr > 13 ? "#84cc16" : sinr > 0 ? "#eab308" : "#ef4444";
+        const sinrIcon = sinr > 20 ? "✅" : sinr > 13 ? "🟢" : sinr > 0 ? "🟡" : "🔴";
+        document.getElementById("sinr").innerHTML = `<span style="color: ${sinrColor}">${sinrIcon} ${sinr} dB</span>`;
+      }
+    }
+    
+    // Signal strength bar (basado en CSQ)
     const csqMatch = sig.csq?.match(/(\d+)\/31/);
     if (csqMatch) {
       const strength = parseInt(csqMatch[1]);
       const percent = Math.round((strength / 31) * 100);
-      const color = strength >= 20 ? "#0f0" : strength >= 10 ? "#ff0" : "#f00";
+      const color = strength >= 20 ? "#22c55e" : strength >= 10 ? "#eab308" : "#ef4444";
       document.getElementById("signalStrength").innerHTML = `
         <div class="meter-bar">
           <div class="meter-fill" style="width: ${percent}%; background: ${color};"></div>
@@ -34,7 +62,9 @@ async function load() {
     }
   } catch (e) {
     document.getElementById("csq").textContent = "Error";
-    document.getElementById("qcsq").textContent = "Módem no detectado";
+    document.getElementById("rsrp").textContent = "–";
+    document.getElementById("rsrq").textContent = "–";
+    document.getElementById("sinr").textContent = "–";
   }
 
   // Modem Info
