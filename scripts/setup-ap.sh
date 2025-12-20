@@ -263,29 +263,29 @@ echo "   [OK] Servicio wlan0-ap habilitado"
 # Verificar si hostapd.service existe
 if [ ! -f /lib/systemd/system/hostapd.service ] && [ ! -f /etc/systemd/system/hostapd.service ]; then
   echo "   [WARN] hostapd.service no existe, creando servicio systemd..."
-  
-  cat > /etc/systemd/system/hostapd.service << 'EOF'
+fi
+
+# Siempre sobrescribir el servicio para evitar problemas con variables
+cat > /etc/systemd/system/hostapd.service << 'EOF'
 [Unit]
-Description=Access point and authentication server for Wi-Fi and Ethernet
-After=network.target
-Before=network-online.target
-Wants=network-online.target
+Description=Access point and authentication server for Wi-Fi
+After=network.target wlan0-ap.service
+Wants=wlan0-ap.service
 
 [Service]
 Type=forking
 PIDFile=/run/hostapd.pid
+ExecStart=/usr/sbin/hostapd -B -P /run/hostapd.pid /etc/hostapd/hostapd.conf
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
-RestartSec=2
-Environment=DAEMON_CONF=/etc/hostapd/hostapd.conf
-ExecStart=/usr/sbin/hostapd -B -P /run/hostapd.pid $DAEMON_CONF
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 EOF
-  
-  systemctl daemon-reload
-  echo "   [OK] Servicio hostapd.service creado"
-fi
+
+systemctl daemon-reload
+echo "   [OK] Servicio hostapd.service configurado"
 
 systemctl unmask hostapd 2>/dev/null || true
 systemctl enable hostapd
@@ -293,31 +293,32 @@ systemctl enable hostapd
 # Verificar si dnsmasq.service existe
 if [ ! -f /lib/systemd/system/dnsmasq.service ] && [ ! -f /etc/systemd/system/dnsmasq.service ]; then
   echo "   [WARN] dnsmasq.service no existe, creando servicio systemd..."
-  
-  cat > /etc/systemd/system/dnsmasq.service << 'EOF'
+fi
+
+# Siempre sobrescribir el servicio de dnsmasq
+mkdir -p /run/dnsmasq
+cat > /etc/systemd/system/dnsmasq.service << 'EOF'
 [Unit]
 Description=dnsmasq - A lightweight DHCP and caching DNS server
-After=network.target
-Before=network-online.target
+After=network.target wlan0-ap.service
+Wants=wlan0-ap.service
 
 [Service]
 Type=forking
 PIDFile=/run/dnsmasq/dnsmasq.pid
+ExecStartPre=/bin/mkdir -p /run/dnsmasq
 ExecStartPre=/usr/sbin/dnsmasq --test
-ExecStart=/usr/sbin/dnsmasq -x /run/dnsmasq/dnsmasq.pid -u dnsmasq -7 /etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new --local-service
+ExecStart=/usr/sbin/dnsmasq -x /run/dnsmasq/dnsmasq.pid
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
-RestartSec=2
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 EOF
-  
-  mkdir -p /run/dnsmasq
-  chown dnsmasq:nogroup /run/dnsmasq 2>/dev/null || true
-  
-  systemctl daemon-reload
-  echo "   [OK] Servicio dnsmasq.service creado"
+
+systemctl daemon-reload
+echo "   [OK] Servicio dnsmasq.service configurado"
 fi
 
 systemctl enable dnsmasq

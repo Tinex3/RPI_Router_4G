@@ -38,7 +38,13 @@ fi
 echo ""
 echo "1️⃣  Instalando dependencias del sistema..."
 sudo apt update
-sudo apt install -y jq iptables iptables-persistent python3-venv python3-pip
+sudo apt install -y jq iptables iptables-persistent python3-venv python3-pip hostapd dnsmasq
+
+# Detener servicios recien instalados (se configuraran despues)
+sudo systemctl stop hostapd 2>/dev/null || true
+sudo systemctl stop dnsmasq 2>/dev/null || true
+sudo systemctl disable hostapd 2>/dev/null || true
+sudo systemctl disable dnsmasq 2>/dev/null || true
 
 echo ""
 echo "2️⃣  Copiando proyecto a $INSTALL_DIR..."
