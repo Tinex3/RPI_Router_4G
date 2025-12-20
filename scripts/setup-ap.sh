@@ -29,23 +29,59 @@ systemctl stop dnsmasq 2>/dev/null || true
 echo ""
 echo "3️⃣  Configurando interfaz wlan0..."
 
-# Backup de dhcpcd.conf si no existe
-if [ ! -f /etc/dhcpcd.conf.backup ]; then
-  cp /etc/dhcpcd.conf /etc/dhcpcd.conf.backup
-fi
+# Detectar sistema de red
+if [ -f /etc/dhcpcd.conf ]; then
+  echo "   📡 Sistema: dhcpcd"
+  
+  # Backup de dhcpcd.conf si no existe
+  if [ ! -f /etc/dhcpcd.conf.backup ]; then
+    cp /etc/dhcpcd.conf /etc/dhcpcd.conf.backup
+  fi
 
-# Configurar IP estática para wlan0
-if ! grep -q "interface wlan0" /etc/dhcpcd.conf; then
-  cat >> /etc/dhcpcd.conf << 'EOF'
+  # Configurar IP estática para wlan0
+  if ! grep -q "interface wlan0" /etc/dhcpcd.conf; then
+    cat >> /etc/dhcpcd.conf << 'EOF'
 
 # Access Point Configuration
 interface wlan0
     static ip_address=192.168.50.1/24
     nohook wpa_supplicant
 EOF
+    echo "   ✅ IP estática configurada en dhcpcd.conf"
+  else
+    echo "   ℹ️  wlan0 ya configurado en dhcpcd.conf"
+  fi
+  
+elif systemctl is-active --quiet NetworkManager; then
+  echo "   📡 Sistema: NetworkManager"
+  
+  # Detener NetworkManager en wlan0
+  nmcli device set wlan0 managed no 2>/dev/null || true
+  
+  # Configurar IP estática manualmente
+  cat > /etc/network/interfaces.d/wlan0 << 'EOF'
+auto wlan0
+iface wlan0 inet static
+    address 192.168.50.1
+    netmask 255.255.255.0
+EOF
+  
   echo "   ✅ IP estática configurada: 192.168.50.1/24"
+  
+  # Aplicar configuración
+  ip addr flush dev wlan0 2>/dev/null || true
+  ip addr add 192.168.50.1/24 dev wlan0
+  ip link set wlan0 up
+  
 else
-  echo "   ℹ️  wlan0 ya configurado en dhcpcd.conf"
+  echo "   📡 Sistema: manual"
+  
+  # Configuración manual directa
+  ip addr flush dev wlan0 2>/dev/null || true
+  ip addr add 192.168.50.1/24 dev wlan0
+  ip link set wlan0 up
+  
+  echo "   ✅ IP configurada manualmente"
 fi
 
 echo ""
@@ -110,9 +146,12 @@ systemctl unmask hostapd
 systemctl enable hostapd
 systemctl enable dnsmasq
 
-# Reiniciar dhcpcd para aplicar IP estática
-systemctl restart dhcpcd
-sleep 2
+# Reiniciar según sistema de red
+if [ -f /etc/dhcpcd.conf ]; then
+  echo "   🔄 Reiniciando dhcpcd..."
+  systemctl restart dhcpcd
+  sleep 2
+fi
 
 # Iniciar servicios
 systemctl restart hostapd
