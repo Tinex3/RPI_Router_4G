@@ -38,7 +38,7 @@ fi
 echo ""
 echo "1️⃣  Instalando dependencias del sistema..."
 sudo apt update
-sudo apt install -y jq iptables iptables-persistent python3-venv python3-pip hostapd dnsmasq
+sudo apt install -y jq iptables iptables-persistent python3-venv python3-pip hostapd dnsmasq curl
 
 # Detener servicios recien instalados (se configuraran despues)
 sudo systemctl stop hostapd 2>/dev/null || true
@@ -47,13 +47,39 @@ sudo systemctl disable hostapd 2>/dev/null || true
 sudo systemctl disable dnsmasq 2>/dev/null || true
 
 echo ""
-echo "2️⃣  Copiando proyecto a $INSTALL_DIR..."
+echo "2️⃣  Instalando Docker..."
+if command -v docker &> /dev/null; then
+  echo "   ✅ Docker ya está instalado: $(docker --version)"
+else
+  echo "   📦 Descargando e instalando Docker..."
+  curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+  sudo sh /tmp/get-docker.sh
+  rm -f /tmp/get-docker.sh
+  echo "   ✅ Docker instalado"
+fi
+
+# Agregar usuario al grupo docker
+if ! groups "$CURRENT_USER" | grep -q docker; then
+  sudo usermod -aG docker "$CURRENT_USER"
+  echo "   ✅ Usuario $CURRENT_USER agregado al grupo docker"
+  DOCKER_GROUP_ADDED=true
+else
+  echo "   ✅ Usuario ya está en el grupo docker"
+  DOCKER_GROUP_ADDED=false
+fi
+
+# Habilitar servicio Docker
+sudo systemctl enable docker
+sudo systemctl start docker
+
+echo ""
+echo "3️⃣  Copiando proyecto a $INSTALL_DIR..."
 sudo mkdir -p "$INSTALL_DIR"
 sudo cp -r . "$INSTALL_DIR/"
 sudo chown -R "$CURRENT_USER:$CURRENT_USER" "$INSTALL_DIR"
 
 echo ""
-echo "3️⃣  Creando entorno virtual Python..."
+echo "4️⃣  Creando entorno virtual Python..."
 cd "$INSTALL_DIR"
 python3 -m venv venv
 source venv/bin/activate
@@ -61,16 +87,16 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 echo ""
-echo "4️⃣  Creando directorio de logs..."
+echo "5️⃣  Creando directorio de logs..."
 sudo mkdir -p "$LOG_DIR"
 sudo chown "$CURRENT_USER:$CURRENT_USER" "$LOG_DIR"
 
 echo ""
-echo "5️⃣  Configurando permisos de scripts..."
+echo "6️⃣  Configurando permisos de scripts..."
 chmod +x scripts/*.sh
 
 echo ""
-echo "6️⃣  Configurando servicios systemd..."
+echo "7️⃣  Configurando servicios systemd..."
 
 # Crear archivo temporal con el usuario correcto
 for service in wan-manager watchdog ec25-router; do
@@ -98,17 +124,17 @@ for service in wan-manager watchdog ec25-router; do
 done
 
 echo ""
-echo "7️⃣  Recargando systemd..."
+echo "8️⃣  Recargando systemd..."
 sudo systemctl daemon-reload
 
 echo ""
-echo "8️⃣  Habilitando e iniciando servicios..."
+echo "9️⃣  Habilitando e iniciando servicios..."
 sudo systemctl enable wan-manager
 sudo systemctl enable watchdog
 sudo systemctl enable ec25-router
 
 echo ""
-echo "9️⃣  Iniciando servicios..."
+echo "🔟 Iniciando servicios..."
 sudo systemctl start wan-manager
 sleep 2
 sudo systemctl start watchdog
@@ -128,7 +154,7 @@ for service in wan-manager watchdog ec25-router; do
 done
 
 echo ""
-echo "🔟 Configurando WiFi Access Point..."
+echo "1️⃣1️⃣  Configurando WiFi Access Point..."
 echo ""
 read -p "¿Deseas configurar el Access Point WiFi ahora? (y/n) " -n 1 -r
 echo
@@ -149,6 +175,18 @@ echo "╔═══════════════════════�
 echo "║                  ✅ INSTALACIÓN COMPLETADA                        ║"
 echo "╚════════════════════════════════════════════════════════════════════╝"
 echo ""
+
+# Aviso importante sobre Docker si se agregó al grupo
+if [ "$DOCKER_GROUP_ADDED" = true ]; then
+  echo "⚠️  IMPORTANTE - Docker:"
+  echo "   Se agregó tu usuario al grupo 'docker'."
+  echo "   Para usar Docker sin sudo, debes:"
+  echo "   - Cerrar sesión y volver a entrar, O"
+  echo "   - Ejecutar: newgrp docker"
+  echo "   - O reiniciar el sistema"
+  echo ""
+fi
+
 echo "🌐 Acceso web:"
 echo "   URL: http://$(hostname -I | awk '{print $1}'):5000/"
 echo "   Usuario: admin"
