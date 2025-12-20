@@ -1,0 +1,160 @@
+#!/bin/bash
+# Script de configuración del Access Point WiFi
+# Configura hostapd, dnsmasq y wlan0
+
+set -e
+
+echo "╔════════════════════════════════════════════════════════════════════╗"
+echo "║         Configuración de Access Point WiFi                        ║"
+echo "╚════════════════════════════════════════════════════════════════════╝"
+echo ""
+
+# Verificar root
+if [ "$EUID" -ne 0 ]; then 
+  echo "❌ Este script debe ejecutarse con sudo"
+  exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "1️⃣  Instalando hostapd y dnsmasq..."
+apt update
+apt install -y hostapd dnsmasq
+
+echo ""
+echo "2️⃣  Deteniendo servicios..."
+systemctl stop hostapd 2>/dev/null || true
+systemctl stop dnsmasq 2>/dev/null || true
+
+echo ""
+echo "3️⃣  Configurando interfaz wlan0..."
+
+# Backup de dhcpcd.conf si no existe
+if [ ! -f /etc/dhcpcd.conf.backup ]; then
+  cp /etc/dhcpcd.conf /etc/dhcpcd.conf.backup
+fi
+
+# Configurar IP estática para wlan0
+if ! grep -q "interface wlan0" /etc/dhcpcd.conf; then
+  cat >> /etc/dhcpcd.conf << 'EOF'
+
+# Access Point Configuration
+interface wlan0
+    static ip_address=192.168.50.1/24
+    nohook wpa_supplicant
+EOF
+  echo "   ✅ IP estática configurada: 192.168.50.1/24"
+else
+  echo "   ℹ️  wlan0 ya configurado en dhcpcd.conf"
+fi
+
+echo ""
+echo "4️⃣  Configurando hostapd..."
+cp "$SCRIPT_DIR/../config/hostapd.conf" /etc/hostapd/hostapd.conf
+
+# Apuntar hostapd al archivo de configuración
+if [ -f /etc/default/hostapd ]; then
+  sed -i 's|^#DAEMON_CONF=.*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd
+  sed -i 's|^DAEMON_CONF=.*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd
+fi
+
+echo "   ✅ hostapd configurado"
+echo "   📝 SSID: RPI_Router_4G"
+echo "   🔑 Password: router4g2024"
+echo "   ⚠️  CAMBIAR PASSWORD en /etc/hostapd/hostapd.conf"
+
+echo ""
+echo "5️⃣  Configurando dnsmasq..."
+
+# Backup original
+if [ -f /etc/dnsmasq.conf ] && [ ! -f /etc/dnsmasq.conf.backup ]; then
+  mv /etc/dnsmasq.conf /etc/dnsmasq.conf.backup
+fi
+
+cp "$SCRIPT_DIR/../config/dnsmasq.conf" /etc/dnsmasq.conf
+echo "   ✅ dnsmasq configurado"
+echo "   📡 DHCP Range: 192.168.50.10 - 192.168.50.100"
+
+echo ""
+echo "6️⃣  Habilitando IP forwarding..."
+sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+echo 1 > /proc/sys/net/ipv4/ip_forward
+echo "   ✅ IP forwarding activado"
+
+echo ""
+echo "7️⃣  Configurando NAT/firewall..."
+
+# Asegurar que las reglas de firewall incluyen wlan0
+iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || \
+  iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+
+iptables -t nat -C POSTROUTING -o usb0 -j MASQUERADE 2>/dev/null || \
+  iptables -t nat -A POSTROUTING -o usb0 -j MASQUERADE
+
+iptables -C FORWARD -i wlan0 -o eth0 -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
+
+iptables -C FORWARD -i wlan0 -o usb0 -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i wlan0 -o usb0 -j ACCEPT
+
+iptables -C FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+# Guardar reglas
+netfilter-persistent save
+echo "   ✅ Firewall configurado"
+
+echo ""
+echo "8️⃣  Habilitando y reiniciando servicios..."
+systemctl unmask hostapd
+systemctl enable hostapd
+systemctl enable dnsmasq
+
+# Reiniciar dhcpcd para aplicar IP estática
+systemctl restart dhcpcd
+sleep 2
+
+# Iniciar servicios
+systemctl restart hostapd
+systemctl restart dnsmasq
+
+echo ""
+echo "9️⃣  Verificando estado..."
+echo ""
+
+if systemctl is-active --quiet hostapd; then
+  echo "   ✅ hostapd: RUNNING"
+else
+  echo "   ❌ hostapd: FAILED"
+  echo "      Ver logs: sudo journalctl -u hostapd -n 20"
+fi
+
+if systemctl is-active --quiet dnsmasq; then
+  echo "   ✅ dnsmasq: RUNNING"
+else
+  echo "   ❌ dnsmasq: FAILED"
+  echo "      Ver logs: sudo journalctl -u dnsmasq -n 20"
+fi
+
+echo ""
+echo "╔════════════════════════════════════════════════════════════════════╗"
+echo "║              ✅ CONFIGURACIÓN COMPLETADA                          ║"
+echo "╚════════════════════════════════════════════════════════════════════╝"
+echo ""
+echo "📡 Red WiFi creada:"
+echo "   SSID: RPI_Router_4G"
+echo "   Password: router4g2024"
+echo "   IP Gateway: 192.168.50.1"
+echo "   DHCP Range: 192.168.50.10 - 192.168.50.100"
+echo ""
+echo "🔧 Para cambiar SSID/Password:"
+echo "   sudo nano /etc/hostapd/hostapd.conf"
+echo "   sudo systemctl restart hostapd"
+echo ""
+echo "📝 Ver logs:"
+echo "   sudo journalctl -u hostapd -f"
+echo "   sudo journalctl -u dnsmasq -f"
+echo ""
+echo "🔍 Ver clientes conectados:"
+echo "   arp -n | grep 192.168.50"
+echo ""
