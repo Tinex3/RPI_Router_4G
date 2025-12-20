@@ -77,11 +77,12 @@ for service in wan-manager watchdog ec25-router; do
     if [ "$service" = "wan-manager" ] || [ "$service" = "watchdog" ]; then
       sed "s/User=.*/User=root/" "$SERVICE_FILE" > "$TEMP_FILE"
     else
-      # Para ec25-router: usar usuario actual
-      sed "s/User=benjamin/User=$CURRENT_USER/" "$SERVICE_FILE" > "$TEMP_FILE"
+      # Para ec25-router: reemplazar TODOS los placeholders posibles
+      sed "s/User=%USER%/User=$CURRENT_USER/" "$SERVICE_FILE" > "$TEMP_FILE"
+      sed -i "s/User=benjamin/User=$CURRENT_USER/" "$TEMP_FILE"
       sed -i "s|WorkingDirectory=.*|WorkingDirectory=$INSTALL_DIR|" "$TEMP_FILE"
-      sed -i "s|Environment=\"PATH=.*|Environment=\"PATH=$INSTALL_DIR/venv/bin\"|" "$TEMP_FILE"
-      sed -i "s|ExecStart=.*|ExecStart=$INSTALL_DIR/venv/bin/gunicorn -w 2 -b 0.0.0.0:5000 run:app|" "$TEMP_FILE"
+      sed -i "s|Environment=\"PATH=/opt/ec25-router/venv/bin.*\"|Environment=\"PATH=$INSTALL_DIR/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"|" "$TEMP_FILE"
+      sed -i "s|ExecStart=/opt/ec25-router.*|ExecStart=$INSTALL_DIR/venv/bin/gunicorn -w 2 -b 0.0.0.0:5000 run:app|" "$TEMP_FILE"
     fi
     
     sudo cp "$TEMP_FILE" "/etc/systemd/system/${service}.service"
