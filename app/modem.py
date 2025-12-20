@@ -20,23 +20,23 @@ def find_at_port(force_refresh=False):
     for p in sorted(glob.glob("/dev/ttyUSB*")):
         try:
             logger.debug(f"Probando puerto AT: {p}")
-            with serial.Serial(p, BAUDRATE, timeout=2, rtscts=False, dsrdtr=False) as s:
+            with serial.Serial(p, BAUDRATE, timeout=1, rtscts=False, dsrdtr=False) as s:
                 # Limpiar buffer
                 s.reset_input_buffer()
                 s.reset_output_buffer()
                 
                 # Enviar AT y esperar respuesta completa
                 s.write(b"AT\r\n")
-                time.sleep(0.3)
+                time.sleep(0.2)
                 
                 # Leer respuesta en múltiples intentos
                 response = ""
-                for _ in range(3):
+                for _ in range(2):
                     chunk = s.read(s.in_waiting or 64).decode(errors="ignore")
                     response += chunk
                     if "OK" in response or "ERROR" in response:
                         break
-                    time.sleep(0.2)
+                    time.sleep(0.15)
                 
                 logger.debug(f"Puerto {p} responde: {repr(response[:150])}")
                 if "OK" in response:

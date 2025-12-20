@@ -9,7 +9,7 @@ Type=simple
 User=%USER%
 WorkingDirectory=/opt/ec25-router
 Environment="PATH=/opt/ec25-router/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ExecStart=/opt/ec25-router/venv/bin/gunicorn -w 2 -b 0.0.0.0:5000 run:app
+ExecStart=/opt/ec25-router/venv/bin/gunicorn -w 2 -b 0.0.0.0:5000 --timeout 60 run:app
 Restart=always
 RestartSec=3
 
