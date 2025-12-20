@@ -765,7 +765,7 @@ def api_gateway_container_status():
     try:
         # Verificar si el contenedor existe
         result = subprocess.run(
-            ["docker", "ps", "-a", "--filter", "name=basicstation", "--format", "{{.Status}}"],
+            ["sudo", "docker", "ps", "-a", "--filter", "name=basicstation", "--format", "{{.Status}}"],
             capture_output=True,
             text=True,
             timeout=10
@@ -840,7 +840,7 @@ def api_gateway_detect_eui():
         # Script que ejecuta el comando y guarda el resultado
         script = f'''#!/bin/bash
 echo "Ejecutando docker run..." >> {log_file}
-docker run --privileged --rm -e GATEWAY_EUI_SOURCE=chip xoseperez/basicstation:latest gateway_eui >> {log_file} 2>&1
+sudo docker run --privileged --rm -e GATEWAY_EUI_SOURCE=chip xoseperez/basicstation:latest gateway_eui >> {log_file} 2>&1
 echo "" >> {log_file}
 echo "=== Comando completado ===" >> {log_file}
 rm -f {pid_file}
@@ -969,7 +969,7 @@ def api_gateway_start():
     try:
         # Usar docker-compose up
         result = subprocess.run(
-            ["docker", "compose", "-f", BASICSTATION_COMPOSE, "up", "-d"],
+            ["sudo", "docker", "compose", "-f", BASICSTATION_COMPOSE, "up", "-d"],
             capture_output=True,
             text=True,
             timeout=120,
@@ -981,7 +981,7 @@ def api_gateway_start():
         else:
             # Intentar con docker-compose (guion)
             result = subprocess.run(
-                ["docker-compose", "-f", BASICSTATION_COMPOSE, "up", "-d"],
+                ["sudo", "docker-compose", "-f", BASICSTATION_COMPOSE, "up", "-d"],
                 capture_output=True,
                 text=True,
                 timeout=120,
@@ -1006,7 +1006,7 @@ def api_gateway_stop():
     
     try:
         result = subprocess.run(
-            ["docker", "stop", "basicstation"],
+            ["sudo", "docker", "stop", "basicstation"],
             capture_output=True,
             text=True,
             timeout=30
@@ -1028,7 +1028,7 @@ def api_gateway_logs():
     """Obtiene logs del contenedor BasicStation"""
     try:
         result = subprocess.run(
-            ["docker", "logs", "--tail", "100", "basicstation"],
+            ["sudo", "docker", "logs", "--tail", "100", "basicstation"],
             capture_output=True,
             text=True,
             timeout=10
