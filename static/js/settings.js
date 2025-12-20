@@ -1,93 +1,59 @@
-// ============== WiFi AP Configuration ==============
+/* =====================================================
+   EC25 Router - Settings Page JavaScript
+   ===================================================== */
 
-async function loadWiFiConfig() {
-  try {
-    const response = await fetch("/api/wifi/config");
-    const config = await response.json();
-    
-    document.getElementById("wifi-ssid").value = config.ssid || "";
-    document.getElementById("wifi-channel").value = config.channel || "6";
-    // Password no se muestra por seguridad, solo placeholder
-    document.getElementById("wifi-password").placeholder = config.password_masked || "********";
-    
-  } catch (e) {
-    console.error("Error loading WiFi config:", e);
-  }
-}
+// ============== APN Configuration ==============
 
-async function saveWiFi() {
-  const ssid = document.getElementById("wifi-ssid").value.trim();
-  const password = document.getElementById("wifi-password").value;
-  const channel = document.getElementById("wifi-channel").value;
-  const statusEl = document.getElementById("wifi-status");
+async function saveAPN() {
+  const apn = document.getElementById("apn").value.trim();
+  const statusEl = document.getElementById("apn-status");
   
-  if (!ssid) {
-    statusEl.textContent = "Error: SSID no puede estar vacio";
-    statusEl.className = "status-msg error";
+  if (!apn) {
+    showStatus("apn-status", "error", "El APN no puede estar vacio");
     return;
   }
   
-  if (password && password.length < 8) {
-    statusEl.textContent = "Error: Password debe tener minimo 8 caracteres";
-    statusEl.className = "status-msg error";
-    return;
-  }
-  
-  statusEl.textContent = "Guardando y reiniciando WiFi...";
-  statusEl.className = "status-msg info";
-  
   try {
-    const response = await fetch("/api/wifi/config", {
+    const response = await fetch("/api/apn", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ssid, password, channel})
+      body: JSON.stringify({apn})
     });
     
     const data = await response.json();
     
     if (data.ok) {
-      statusEl.textContent = "WiFi actualizado! Nueva red: " + data.ssid;
-      statusEl.className = "status-msg success";
-      // Limpiar campo de password
-      document.getElementById("wifi-password").value = "";
-      // Recargar config
-      loadWiFiConfig();
+      showStatus("apn-status", "success", "APN actualizado correctamente");
+      showNotification("success", "APN guardado: " + apn);
     } else {
-      statusEl.textContent = "Error: " + data.error;
-      statusEl.className = "status-msg error";
+      showStatus("apn-status", "error", data.error || "Error al guardar APN");
     }
   } catch (e) {
-    statusEl.textContent = "Error de conexion";
-    statusEl.className = "status-msg error";
+    showStatus("apn-status", "error", "Error de conexion");
   }
 }
 
-function togglePassword(inputId) {
-  const input = document.getElementById(inputId);
-  input.type = input.type === "password" ? "text" : "password";
-}
+// ============== Security Configuration ==============
 
-// Cargar config al inicio
-document.addEventListener("DOMContentLoaded", loadWiFiConfig);
-
-// ============== APN & Security ==============
-
-async function saveAPN(){
-  const apn = document.getElementById("apn").value.trim();
-  await fetch("/api/apn", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({apn})
-  });
-  alert("APN actualizado");
-}
-
-async function applySecurity(){
+async function applySecurity() {
   const isolate_clients = document.getElementById("isolate").checked;
-  await fetch("/api/security", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({isolate_clients})
-  });
-  alert("Seguridad aplicada");
+  
+  try {
+    const response = await fetch("/api/security", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({isolate_clients})
+    });
+    
+    const data = await response.json();
+    
+    if (data.ok) {
+      showStatus("security-status", "success", "Configuracion de seguridad aplicada");
+      showNotification("success", isolate_clients ? "Clientes WiFi aislados" : "Aislamiento desactivado");
+    } else {
+      showStatus("security-status", "error", data.error || "Error al aplicar seguridad");
+    }
+  } catch (e) {
+    showStatus("security-status", "error", "Error de conexion");
+  }
 }

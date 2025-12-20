@@ -1,53 +1,48 @@
 {% extends "base.html" %}
+{% block title %}Configuracion - EC25 Router{% endblock %}
+{% block page_title %}Configuracion del Modem{% endblock %}
+
 {% block content %}
-<div class="card">
-  <h2>Configuracion WiFi AP</h2>
-  
-  <div class="info-list">
-    <div class="info-item">
-      <label>Nombre de la red (SSID)</label>
-      <input id="wifi-ssid" class="input" placeholder="RPI_Router_4G" value="">
+<div class="grid">
+  <div class="card">
+    <h2>
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px;">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+      </svg>
+      Seguridad de Red
+    </h2>
+    
+    <div class="form-group">
+      <label class="check">
+        <input id="isolate" type="checkbox" {% if cfg.security.isolate_clients %}checked{% endif %}>
+        Aislar clientes WiFi
+      </label>
+      <span class="hint">Evita que los dispositivos conectados se vean entre ellos</span>
     </div>
-    <div class="info-item">
-      <label>Contrasena WiFi</label>
-      <div class="password-wrapper">
-        <input id="wifi-password" type="password" class="input" placeholder="********" value="">
-        <button type="button" class="btn-icon" onclick="togglePassword('wifi-password')">👁</button>
-      </div>
-      <small class="hint">Minimo 8 caracteres</small>
-    </div>
-    <div class="info-item">
-      <label>Canal WiFi</label>
-      <select id="wifi-channel" class="input">
-        <option value="1">Canal 1 (2412 MHz)</option>
-        <option value="6" selected>Canal 6 (2437 MHz)</option>
-        <option value="11">Canal 11 (2462 MHz)</option>
-      </select>
-    </div>
+    
+    <button class="btn" onclick="applySecurity()">Aplicar Seguridad</button>
+    <div id="security-status" class="status-msg"></div>
   </div>
-  <button class="btn" onclick="saveWiFi()">Guardar y Reiniciar WiFi</button>
-  <div id="wifi-status" class="status-msg"></div>
-</div>
 
-<div class="card">
-  <h2>Configuracion Modem</h2>
-
-  <div class="row">
-    <div class="col">
-      <label>APN</label>
-      <input id="apn" class="input" value="{{ cfg.apn }}">
+  <div class="card">
+    <h2>
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px;">
+        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+        <line x1="6" y1="6" x2="6.01" y2="6"></line>
+        <line x1="6" y1="18" x2="6.01" y2="18"></line>
+      </svg>
+      Configuracion APN
+    </h2>
+    
+    <div class="form-group">
+      <label for="apn">APN del Operador</label>
+      <input id="apn" class="input" value="{{ cfg.apn }}" placeholder="Ej: wap.tmovil.cl">
+      <span class="hint">Configuracion del punto de acceso para datos moviles</span>
     </div>
+    
     <button class="btn" onclick="saveAPN()">Guardar APN</button>
-  </div>
-
-  <hr class="hr">
-
-  <div class="row">
-    <label class="check">
-      <input id="isolate" type="checkbox" {% if cfg.security.isolate_clients %}checked{% endif %}>
-      Aislar clientes Wi-Fi (evita que se vean entre ellos)
-    </label>
-    <button class="btn" onclick="applySecurity()">Aplicar</button>
+    <div id="apn-status" class="status-msg"></div>
   </div>
 </div>
 

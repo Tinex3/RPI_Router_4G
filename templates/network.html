@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}Red WiFi - EC25 Router{% endblock %}
+{% block page_title %}Configuracion de Red WiFi{% endblock %}
+
+{% block content %}
+<div class="grid">
+  <!-- Panel de Estado WiFi AP -->
+  <div class="card">
+    <h2>
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px;">
+        <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+        <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+        <circle cx="12" cy="20" r="1"></circle>
+      </svg>
+      Estado del Access Point
+    </h2>
+    
+    <div class="info-list">
+      <div class="info-item">
+        <span class="label">Estado</span>
+        <span id="ap-status" class="value">
+          <span class="badge badge-info">Cargando...</span>
+        </span>
+      </div>
+      <div class="info-item">
+        <span class="label">Interfaz</span>
+        <span id="ap-interface" class="value">wlan0</span>
+      </div>
+      <div class="info-item">
+        <span class="label">IP del AP</span>
+        <span id="ap-ip" class="value">192.168.50.1</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Clientes Conectados</span>
+        <span id="ap-clients" class="value">-</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel de Info de Red -->
+  <div class="card">
+    <h2>
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px;">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="2" y1="12" x2="22" y2="12"></line>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+      </svg>
+      Informacion de Red
+    </h2>
+    
+    <div class="info-list">
+      <div class="info-item">
+        <span class="label">SSID Actual</span>
+        <span id="current-ssid" class="value">-</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Canal</span>
+        <span id="current-channel" class="value">-</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Seguridad</span>
+        <span id="current-security" class="value">WPA2-PSK</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Rango DHCP</span>
+        <span class="value">192.168.50.10 - 100</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Configuracion del Access Point -->
+<div class="card mt-2">
+  <h2>
+    <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px;">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </svg>
+    Configuracion del Access Point
+  </h2>
+  
+  <form id="wifi-config-form" onsubmit="return saveWiFiConfig(event)">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="wifi-ssid">Nombre de la Red (SSID)</label>
+        <input type="text" id="wifi-ssid" class="input" placeholder="Nombre de tu red WiFi" maxlength="32" required>
+        <span class="hint">Maximo 32 caracteres</span>
+      </div>
+      
+      <div class="form-group">
+        <label for="wifi-channel">Canal WiFi</label>
+        <select id="wifi-channel" class="input">
+          <option value="1">Canal 1 (2412 MHz)</option>
+          <option value="2">Canal 2 (2417 MHz)</option>
+          <option value="3">Canal 3 (2422 MHz)</option>
+          <option value="4">Canal 4 (2427 MHz)</option>
+          <option value="5">Canal 5 (2432 MHz)</option>
+          <option value="6" selected>Canal 6 (2437 MHz) - Recomendado</option>
+          <option value="7">Canal 7 (2442 MHz)</option>
+          <option value="8">Canal 8 (2447 MHz)</option>
+          <option value="9">Canal 9 (2452 MHz)</option>
+          <option value="10">Canal 10 (2457 MHz)</option>
+          <option value="11">Canal 11 (2462 MHz)</option>
+        </select>
+        <span class="hint">Canales 1, 6 y 11 no se superponen</span>
+      </div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-group">
+        <label for="wifi-password">Contrasena WiFi</label>
+        <div class="password-wrapper">
+          <input type="password" id="wifi-password" class="input" placeholder="Dejar vacio para mantener actual" minlength="8" maxlength="63">
+          <button type="button" class="btn-icon" onclick="togglePassword('wifi-password')" title="Mostrar/Ocultar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </button>
+        </div>
+        <span class="hint">Minimo 8, maximo 63 caracteres. Dejar vacio para no cambiar.</span>
+      </div>
+      
+      <div class="form-group">
+        <label for="wifi-country">Codigo de Pais</label>
+        <select id="wifi-country" class="input">
+          <option value="CL" selected>Chile (CL)</option>
+          <option value="US">Estados Unidos (US)</option>
+          <option value="AR">Argentina (AR)</option>
+          <option value="PE">Peru (PE)</option>
+          <option value="MX">Mexico (MX)</option>
+          <option value="CO">Colombia (CO)</option>
+          <option value="ES">Espana (ES)</option>
+        </select>
+        <span class="hint">Afecta canales y potencia disponibles</span>
+      </div>
+    </div>
+    
+    <div class="form-group">
+      <label class="check">
+        <input type="checkbox" id="wifi-hidden">
+        Red oculta (no transmitir SSID)
+      </label>
+    </div>
+    
+    <div class="row mt-2">
+      <button type="submit" class="btn" id="btn-save-wifi">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+          <polyline points="17 21 17 13 7 13 7 21"></polyline>
+          <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+        Guardar y Reiniciar WiFi
+      </button>
+    </div>
+    
+    <div id="wifi-status" class="status-msg"></div>
+  </form>
+</div>
+
+<!-- Escaneo de Redes WiFi Cercanas -->
+<div class="card mt-2">
+  <h2>
+    <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px;">
+      <circle cx="11" cy="11" r="8"></circle>
+      <path d="m21 21-4.35-4.35"></path>
+    </svg>
+    Redes WiFi Cercanas
+  </h2>
+  <p class="text-muted mb-2">Escanea las redes WiFi cercanas para ver la ocupacion de canales y elegir el mejor.</p>
+  
+  <div class="row mb-2">
+    <button type="button" class="btn btn-secondary" id="btn-scan-wifi" onclick="scanWiFiNetworks()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;">
+        <path d="M23 4v6h-6"></path>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+      </svg>
+      Escanear Redes
+    </button>
+  </div>
+  
+  <div id="wifi-scan-results" class="network-list" style="display:none;">
+    <!-- Las redes escaneadas apareceran aqui -->
+  </div>
+  
+  <div id="wifi-scan-empty" class="text-center text-muted" style="padding: 40px 0;">
+    Presiona "Escanear Redes" para ver las redes WiFi cercanas
+  </div>
+</div>
+
+<!-- Clientes Conectados -->
+<div class="card mt-2">
+  <h2>
+    <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px;">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+      <circle cx="9" cy="7" r="4"></circle>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+    </svg>
+    Clientes Conectados
+  </h2>
+  
+  <div id="clients-list">
+    <table>
+      <thead>
+        <tr>
+          <th>Direccion MAC</th>
+          <th>IP Asignada</th>
+          <th>Hostname</th>
+          <th>Tiempo Conectado</th>
+        </tr>
+      </thead>
+      <tbody id="clients-table-body">
+        <tr>
+          <td colspan="4" class="text-center text-muted">Cargando clientes...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script src="/static/js/network.js"></script>
+{% endblock %}

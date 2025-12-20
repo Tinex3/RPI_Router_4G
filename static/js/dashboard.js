@@ -1,3 +1,30 @@
+async function loadSystemInfo() {
+  try {
+    const info = await (await fetch("/api/system/info")).json();
+    
+    if (info.uptime) {
+      document.getElementById("sysUptime").textContent = info.uptime;
+    }
+    if (info.cpu_temp) {
+      const temp = parseFloat(info.cpu_temp);
+      const color = temp > 70 ? "#ef4444" : temp > 60 ? "#f59e0b" : "#22c55e";
+      document.getElementById("sysCPU").innerHTML = `<span style="color:${color}">${info.cpu_temp}</span>`;
+    }
+    if (info.memory_percent !== undefined) {
+      const mem = info.memory_percent;
+      const color = mem > 80 ? "#ef4444" : mem > 60 ? "#f59e0b" : "#22c55e";
+      document.getElementById("sysMemory").innerHTML = `<span style="color:${color}">${mem}%</span>`;
+    }
+    if (info.disk_percent !== undefined) {
+      const disk = info.disk_percent;
+      const color = disk > 80 ? "#ef4444" : disk > 60 ? "#f59e0b" : "#22c55e";
+      document.getElementById("sysDisk").innerHTML = `<span style="color:${color}">${disk}%</span>`;
+    }
+  } catch (e) {
+    console.error("Error loading system info:", e);
+  }
+}
+
 async function load() {
   // WAN Status
   try {
@@ -140,4 +167,6 @@ async function runSpeedtest() {
 }
 
 setInterval(load, 5000);
+setInterval(loadSystemInfo, 10000);
 load();
+loadSystemInfo();

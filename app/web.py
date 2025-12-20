@@ -1,6 +1,7 @@
 import logging
 import subprocess
 import re
+import os
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 
@@ -11,6 +12,59 @@ from .firewall import apply_firewall
 from .speedtest import run_speedtest
 
 web = Blueprint("web", __name__)
+
+# ============== Helper Functions ==============
+
+def get_system_info():
+    """Obtiene informacion del sistema"""
+    info = {
+        "hostname": "Unknown",
+        "uptime": "Unknown",
+        "cpu_temp": "N/A",
+        "memory_used": 0,
+        "memory_total": 0,
+        "disk_used": 0,
+        "disk_total": 0
+    }
+    
+    try:
+        # Hostname
+        info["hostname"] = subprocess.check_output(["hostname"], text=True).strip()
+        
+        # Uptime
+        with open("/proc/uptime", "r") as f:
+            uptime_seconds = float(f.read().split()[0])
+            days = int(uptime_seconds // 86400)
+            hours = int((uptime_seconds % 86400) // 3600)
+            mins = int((uptime_seconds % 3600) // 60)
+            info["uptime"] = f"{days}d {hours}h {mins}m"
+            info["uptime_seconds"] = uptime_seconds
+        
+        # CPU Temperature
+        if os.path.exists("/sys/class/thermal/thermal_zone0/temp"):
+            with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+                temp = int(f.read().strip()) / 1000
+                info["cpu_temp"] = f"{temp:.1f}C"
+        
+        # Memory
+        with open("/proc/meminfo", "r") as f:
+            meminfo = f.read()
+            total = int(re.search(r"MemTotal:\s+(\d+)", meminfo).group(1)) * 1024
+            available = int(re.search(r"MemAvailable:\s+(\d+)", meminfo).group(1)) * 1024
+            info["memory_total"] = total
+            info["memory_used"] = total - available
+            info["memory_percent"] = round((total - available) / total * 100, 1)
+        
+        # Disk
+        stat = os.statvfs("/")
+        info["disk_total"] = stat.f_blocks * stat.f_frsize
+        info["disk_used"] = (stat.f_blocks - stat.f_bfree) * stat.f_frsize
+        info["disk_percent"] = round(info["disk_used"] / info["disk_total"] * 100, 1)
+        
+    except Exception as e:
+        logging.error("Error getting system info: %s", e)
+    
+    return info
 
 @web.route("/login", methods=["GET", "POST"])
 def login():
@@ -39,11 +93,16 @@ def logout():
 def dashboard():
     return render_template("dashboard.html", username=current_user.username)
 
+@web.route("/network")
+@login_required
+def network_config():
+    return render_template("network.html", username=current_user.username)
+
 @web.route("/settings")
 @login_required
 def settings():
     cfg = load_config()
-    return render_template("settings.html", cfg=cfg)
+    return render_template("settings.html", cfg=cfg, username=current_user.username)
 
 @web.route("/api/signal")
 @login_required
@@ -238,3 +297,180 @@ def api_wifi_set_config():
     except Exception as e:
         logging.error("Error saving WiFi config: %s", e)
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ============== WiFi Status & Scan ==============
+
+@web.route("/api/wifi/status")
+@login_required
+def api_wifi_status():
+    """Obtiene estado del Access Point"""
+    status = {
+        "running": False,
+        "clients": 0,
+        "ip": "192.168.50.1"
+    }
+    
+    try:
+        # Verificar si hostapd esta corriendo
+        result = subprocess.run(
+            ["systemctl", "is-active", "hostapd"],
+            capture_output=True, text=True
+        )
+        status["running"] = result.stdout.strip() == "active"
+        
+        # Contar clientes conectados
+        if os.path.exists("/var/lib/misc/dnsmasq.leases"):
+            with open("/var/lib/misc/dnsmasq.leases", "r") as f:
+                leases = [l for l in f.readlines() if l.strip()]
+                status["clients"] = len(leases)
+        
+        # Obtener IP de wlan0
+        result = subprocess.run(
+            ["ip", "-4", "addr", "show", "wlan0"],
+            capture_output=True, text=True
+        )
+        ip_match = re.search(r"inet (\d+\.\d+\.\d+\.\d+)", result.stdout)
+        if ip_match:
+            status["ip"] = ip_match.group(1)
+            
+    except Exception as e:
+        logging.error("Error getting WiFi status: %s", e)
+    
+    return jsonify(status)
+
+
+@web.route("/api/wifi/scan")
+@login_required
+def api_wifi_scan():
+    """Escanea redes WiFi cercanas"""
+    networks = []
+    
+    try:
+        # Usar iw para escanear (puede requerir permisos)
+        result = subprocess.run(
+            ["sudo", "iw", "dev", "wlan0", "scan"],
+            capture_output=True, text=True, timeout=30
+        )
+        
+        if result.returncode != 0:
+            # Si falla con wlan0, intentar sin especificar interface
+            logging.warning("WiFi scan failed, trying alternative method")
+            return jsonify({"ok": False, "error": "Escaneo no disponible (AP activo)"})
+        
+        # Parsear resultados
+        current_network = {}
+        for line in result.stdout.split('\n'):
+            line = line.strip()
+            
+            if line.startswith("BSS "):
+                if current_network.get("ssid"):
+                    networks.append(current_network)
+                mac = line.split()[1].split("(")[0]
+                current_network = {"mac": mac, "ssid": "", "signal": -100, "channel": 0, "security": "Open"}
+                
+            elif line.startswith("SSID:"):
+                current_network["ssid"] = line[6:].strip()
+                
+            elif line.startswith("signal:"):
+                try:
+                    current_network["signal"] = int(float(line.split()[1]))
+                except:
+                    pass
+                    
+            elif line.startswith("DS Parameter set: channel"):
+                try:
+                    current_network["channel"] = int(line.split()[-1])
+                except:
+                    pass
+                    
+            elif "WPA" in line or "RSN" in line:
+                current_network["security"] = "WPA2" if "RSN" in line else "WPA"
+            elif "WEP" in line:
+                current_network["security"] = "WEP"
+        
+        # Agregar ultima red
+        if current_network.get("ssid"):
+            networks.append(current_network)
+        
+        # Ordenar por senal
+        networks.sort(key=lambda x: x["signal"], reverse=True)
+        
+        return jsonify({"ok": True, "networks": networks})
+        
+    except subprocess.TimeoutExpired:
+        return jsonify({"ok": False, "error": "Timeout al escanear"})
+    except Exception as e:
+        logging.error("Error scanning WiFi: %s", e)
+        return jsonify({"ok": False, "error": str(e)})
+
+
+@web.route("/api/wifi/clients")
+@login_required
+def api_wifi_clients():
+    """Obtiene lista de clientes conectados"""
+    clients = []
+    
+    try:
+        # Leer leases de dnsmasq
+        if os.path.exists("/var/lib/misc/dnsmasq.leases"):
+            with open("/var/lib/misc/dnsmasq.leases", "r") as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) >= 4:
+                        # Formato: timestamp mac ip hostname client_id
+                        clients.append({
+                            "mac": parts[1],
+                            "ip": parts[2],
+                            "hostname": parts[3] if parts[3] != "*" else None,
+                            "connected_time": None  # TODO: calcular desde timestamp
+                        })
+        
+        return jsonify({"ok": True, "clients": clients})
+        
+    except Exception as e:
+        logging.error("Error getting WiFi clients: %s", e)
+        return jsonify({"ok": False, "error": str(e)})
+
+
+# ============== System Control ==============
+
+@web.route("/api/system/restart", methods=["POST"])
+@login_required
+def api_system_restart():
+    """Reinicia el sistema"""
+    logging.warning("System restart requested by %s", current_user.username)
+    try:
+        subprocess.Popen(["sudo", "shutdown", "-r", "+1"], 
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return jsonify({"ok": True, "message": "Sistema reiniciando en 1 minuto..."})
+    except Exception as e:
+        logging.error("Error restarting system: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@web.route("/api/system/shutdown", methods=["POST"])
+@login_required
+def api_system_shutdown():
+    """Apaga el sistema"""
+    logging.warning("System shutdown requested by %s", current_user.username)
+    try:
+        subprocess.Popen(["sudo", "shutdown", "-h", "+1"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return jsonify({"ok": True, "message": "Sistema apagandose en 1 minuto..."})
+    except Exception as e:
+        logging.error("Error shutting down system: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@web.route("/api/system/info")
+@login_required
+def api_system_info():
+    """Obtiene informacion del sistema"""
+    return jsonify(get_system_info())
+
+
+@web.route("/restarting")
+def restarting():
+    """Pagina de reinicio"""
+    return render_template("restarting.html")

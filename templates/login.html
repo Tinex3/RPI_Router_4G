@@ -7,27 +7,47 @@
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-  <main class="container narrow">
-    <div class="card">
-      <h1>Login</h1>
+  <div class="login-container">
+    <div class="login-card">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 48px; height: 48px; color: var(--accent); margin-bottom: 12px;">
+          <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+          <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+          <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+          <circle cx="12" cy="20" r="1"></circle>
+        </svg>
+        <h1 style="font-size: 1.5rem; margin: 0;">EC25 Router</h1>
+        <p style="color: var(--muted); margin-top: 8px;">Panel de Administracion</p>
+      </div>
+      
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-          <div class="flash">
+          <div class="alerts">
             {% for cat, msg in messages %}
-              <div class="flash-item {{cat}}">{{ msg }}</div>
+              <div class="alert alert-{{cat}}">{{ msg }}</div>
             {% endfor %}
           </div>
         {% endif %}
       {% endwith %}
+      
       <form method="POST">
-        <label>Usuario</label>
-        <input name="username" class="input" placeholder="admin" required autofocus>
-        <label>Password</label>
-        <input name="password" class="input" type="password" required>
-        <button class="btn" style="margin-top: 14px; width: 100%;">Entrar</button>
+        <div class="form-group">
+          <label for="username">Usuario</label>
+          <input name="username" id="username" class="input" placeholder="admin" required autofocus>
+        </div>
+        <div class="form-group">
+          <label for="password">Contrasena</label>
+          <input name="password" id="password" class="input" type="password" placeholder="********" required>
+        </div>
+        <button class="btn btn-block" style="margin-top: 8px;">
+          Iniciar Sesion
+        </button>
       </form>
-      <p class="muted">Default: admin / admin1234 (cámbiala después)</p>
+      
+      <p style="color: var(--text-label); text-align: center; margin-top: 20px; font-size: 0.85rem;">
+        Credenciales por defecto: admin / admin1234
+      </p>
     </div>
-  </main>
+  </div>
 </body>
 </html>

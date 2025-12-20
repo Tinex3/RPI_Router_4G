@@ -1,5 +1,38 @@
 {% extends "base.html" %}
+{% block title %}Dashboard - EC25 Router{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
 {% block content %}
+<!-- Info del Sistema -->
+<div class="card mb-2">
+  <h2>
+    <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px;">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+      <line x1="8" y1="21" x2="16" y2="21"></line>
+      <line x1="12" y1="17" x2="12" y2="21"></line>
+    </svg>
+    Estado del Sistema
+  </h2>
+  <div class="system-stats">
+    <div class="stat-item">
+      <div id="sysUptime" class="stat-value">--</div>
+      <div class="stat-label">Uptime</div>
+    </div>
+    <div class="stat-item">
+      <div id="sysCPU" class="stat-value">--</div>
+      <div class="stat-label">Temperatura</div>
+    </div>
+    <div class="stat-item">
+      <div id="sysMemory" class="stat-value">--%</div>
+      <div class="stat-label">Memoria</div>
+    </div>
+    <div class="stat-item">
+      <div id="sysDisk" class="stat-value">--%</div>
+      <div class="stat-label">Disco</div>
+    </div>
+  </div>
+</div>
+
 <div class="grid">
   <div class="card">
     <h2>🌐 WAN</h2>

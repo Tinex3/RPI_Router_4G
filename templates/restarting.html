@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reiniciando - EC25 Router</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    .restarting-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+    }
+    .restarting-spinner {
+      width: 60px;
+      height: 60px;
+      border: 4px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 24px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .restarting-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .restarting-message {
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+    .countdown {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <div class="restarting-container">
+    <div class="restarting-spinner"></div>
+    <h1 class="restarting-title">Reiniciando el Sistema</h1>
+    <p class="restarting-message">Por favor espera mientras el dispositivo se reinicia...</p>
+    <p class="countdown" id="countdown">60</p>
+    <p class="text-muted">segundos restantes</p>
+  </div>
+  
+  <script>
+    let seconds = 60;
+    const countdownEl = document.getElementById('countdown');
+    
+    const interval = setInterval(() => {
+      seconds--;
+      countdownEl.textContent = seconds;
+      
+      if (seconds <= 0) {
+        clearInterval(interval);
+        checkConnection();
+      }
+    }, 1000);
+    
+    async function checkConnection() {
+      countdownEl.textContent = '...';
+      
+      for (let i = 0; i < 30; i++) {
+        try {
+          const response = await fetch('/', { method: 'HEAD' });
+          if (response.ok) {
+            window.location.href = '/';
+            return;
+          }
+        } catch (e) {
+          // Ignorar errores de conexion
+        }
+        await new Promise(r => setTimeout(r, 2000));
+      }
+      
+      // Si despues de 60 segundos adicionales no responde
+      countdownEl.textContent = 'Error';
+      document.querySelector('.restarting-message').textContent = 
+        'No se pudo reconectar. Verifica el dispositivo manualmente.';
+    }
+  </script>
+</body>
+</html>

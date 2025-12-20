@@ -3,29 +3,128 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EC25 Router</title>
+  <title>{% block title %}EC25 Router{% endblock %}</title>
   <link rel="stylesheet" href="/static/css/style.css">
+  {% block extra_css %}{% endblock %}
 </head>
 <body>
-  <nav class="nav">
-    <div class="brand">EC25 Router</div>
-    <div class="links">
-      <a href="/">Dashboard</a>
-      <a href="/settings">Settings</a>
-      <a href="/logout">Logout</a>
+  <!-- Navbar superior -->
+  <nav class="navbar">
+    <button class="navbar-toggle" id="sidebarToggle" aria-label="Menu">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+    <a href="/" class="navbar-brand">EC25 Router</a>
+    <div class="navbar-user">
+      <span class="user-name">{{ username if username else 'Usuario' }}</span>
     </div>
   </nav>
-  <main class="container">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="flash">
-          {% for cat, msg in messages %}
-            <div class="flash-item {{cat}}">{{ msg }}</div>
-          {% endfor %}
+
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <nav class="side-menu">
+        <div class="menu-section">
+          <span class="menu-label">Principal</span>
+          <a href="/" class="menu-item {% if request.endpoint == 'web.dashboard' %}active{% endif %}">
+            <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+            Dashboard
+          </a>
         </div>
-      {% endif %}
-    {% endwith %}
-    {% block content %}{% endblock %}
-  </main>
+
+        <div class="menu-section">
+          <span class="menu-label">Configuracion</span>
+          <a href="/network" class="menu-item {% if request.endpoint == 'web.network_config' %}active{% endif %}">
+            <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+              <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+              <circle cx="12" cy="20" r="1"></circle>
+            </svg>
+            Red WiFi
+          </a>
+          <a href="/settings" class="menu-item {% if request.endpoint == 'web.settings' %}active{% endif %}">
+            <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            Modem / APN
+          </a>
+        </div>
+
+        <div class="menu-section">
+          <span class="menu-label">Sistema</span>
+          <a href="#" class="menu-item" onclick="confirmAction('restart')">
+            <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6"></path>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            Reiniciar
+          </a>
+          <a href="#" class="menu-item" onclick="confirmAction('shutdown')">
+            <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+              <line x1="12" y1="2" x2="12" y2="12"></line>
+            </svg>
+            Apagar
+          </a>
+        </div>
+
+        <div class="menu-footer">
+          <a href="/logout" class="menu-item logout-btn">
+            <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            Cerrar Sesion
+          </a>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Contenido principal -->
+    <main class="main-content">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="alerts">
+            {% for cat, msg in messages %}
+              <div class="alert alert-{{cat}}">{{ msg }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      
+      <header class="page-header">
+        <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+        {% block page_subtitle %}{% endblock %}
+      </header>
+      
+      <div class="page-content">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal de confirmacion -->
+  <div id="confirmModal" class="modal">
+    <div class="modal-content">
+      <h3 id="modalTitle">Confirmar Accion</h3>
+      <p id="modalMessage">Estas seguro que deseas realizar esta accion?</p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button id="modalConfirm" class="btn btn-danger">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/main.js"></script>
+  {% block extra_js %}{% endblock %}
 </body>
 </html>
