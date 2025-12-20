@@ -128,6 +128,8 @@ fi
 
 echo ""
 echo "5️⃣  Configurando hostapd..."
+# Crear directorio si no existe
+mkdir -p /etc/hostapd
 cp "$SCRIPT_DIR/../config/hostapd.conf" /etc/hostapd/hostapd.conf
 
 # Apuntar hostapd al archivo de configuración
