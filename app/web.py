@@ -798,15 +798,14 @@ def api_gateway_container_status():
 @web.route("/api/gateway/detect-eui", methods=["POST"])
 @login_required
 def api_gateway_detect_eui():
-    """Detecta el Gateway EUI del chip LoRa"""
+    """Inicia detección del Gateway EUI en background"""
     logging.info("Gateway EUI detection requested by %s", current_user.username)
     
     # Verificar que SPI esté habilitado
     if not check_spi_enabled():
         return jsonify({
             "success": False, 
-            "error": "El bus SPI no está habilitado. Habilítalo primero.",
-            "output": ""
+            "error": "El bus SPI no está habilitado. Habilítalo primero."
         })
     
     # Verificar que Docker esté instalado
@@ -815,54 +814,110 @@ def api_gateway_detect_eui():
     except:
         return jsonify({
             "success": False,
-            "error": "Docker no está instalado",
-            "output": ""
+            "error": "Docker no está instalado"
         })
     
+    log_file = "/tmp/detect-eui.log"
+    pid_file = "/tmp/detect-eui.pid"
+    
+    # Verificar si ya hay una detección en progreso
+    if os.path.exists(pid_file):
+        try:
+            with open(pid_file, "r") as f:
+                pid = int(f.read().strip())
+            os.kill(pid, 0)
+            return jsonify({"success": True, "status": "running"})
+        except (ProcessLookupError, ValueError):
+            os.remove(pid_file)
+    
     try:
-        logging.info("Ejecutando docker para detectar EUI...")
-        result = subprocess.run(
-            ["docker", "run", "--privileged", "--rm", 
-             "-e", "GATEWAY_EUI_SOURCE=chip",
-             "xoseperez/basicstation:latest", "gateway_eui"],
-            capture_output=True,
-            text=True,
-            timeout=120  # 2 minutos para descargar imagen si es necesario
+        # Limpiar log anterior
+        with open(log_file, "w") as f:
+            f.write("=== Detectando Gateway EUI ===\n")
+            f.write("Esto puede tardar 1-2 minutos si es la primera vez\n")
+            f.write("(descargando imagen Docker ~200MB)\n\n")
+        
+        # Script que ejecuta el comando y guarda el resultado
+        script = f'''#!/bin/bash
+echo "Ejecutando docker run..." >> {log_file}
+docker run --privileged --rm -e GATEWAY_EUI_SOURCE=chip xoseperez/basicstation:latest gateway_eui >> {log_file} 2>&1
+echo "" >> {log_file}
+echo "=== Comando completado ===" >> {log_file}
+rm -f {pid_file}
+'''
+        
+        # Guardar script temporal
+        script_file = "/tmp/detect-eui.sh"
+        with open(script_file, "w") as f:
+            f.write(script)
+        os.chmod(script_file, 0o755)
+        
+        # Ejecutar en background
+        process = subprocess.Popen(
+            ["bash", script_file],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
         )
         
-        output = result.stdout + "\n" + result.stderr
-        logging.info("Docker output: %s", output[:500])
+        # Guardar PID
+        with open(pid_file, "w") as f:
+            f.write(str(process.pid))
         
-        # Buscar el EUI en la salida (formato: 16 caracteres hex)
-        eui_match = re.search(r'([0-9A-Fa-f]{16})', output)
+        return jsonify({"success": True, "status": "started", "pid": process.pid})
         
+    except Exception as e:
+        logging.error("Error detecting gateway EUI: %s", e)
+        return jsonify({"success": False, "error": str(e)})
+
+
+@web.route("/api/gateway/detect-eui/status")
+@login_required
+def api_gateway_detect_eui_status():
+    """Obtiene estado y logs de detección de EUI"""
+    log_file = "/tmp/detect-eui.log"
+    pid_file = "/tmp/detect-eui.pid"
+    
+    logs = ""
+    running = False
+    eui = None
+    
+    # Leer logs
+    if os.path.exists(log_file):
+        try:
+            with open(log_file, "r") as f:
+                logs = f.read()
+        except:
+            pass
+    
+    # Verificar si sigue corriendo
+    if os.path.exists(pid_file):
+        try:
+            with open(pid_file, "r") as f:
+                pid = int(f.read().strip())
+            os.kill(pid, 0)
+            running = True
+        except (ProcessLookupError, ValueError, FileNotFoundError):
+            running = False
+            if os.path.exists(pid_file):
+                os.remove(pid_file)
+    
+    # Buscar EUI en los logs si ya terminó
+    if not running and logs:
+        eui_match = re.search(r'([0-9A-Fa-f]{16})', logs)
         if eui_match:
             eui = eui_match.group(1).upper()
-            
-            # Guardar en la config
+            # Guardar en config
             config = read_gateway_config()
             config["gateway_eui"] = eui
             save_gateway_config(config)
-            
-            return jsonify({"success": True, "eui": eui, "output": output})
-        else:
-            return jsonify({
-                "success": False, 
-                "error": "No se pudo detectar el EUI. Verifica que el concentrador LoRa esté conectado.",
-                "output": output
-            })
-            
-    except subprocess.TimeoutExpired:
-        return jsonify({
-            "success": False, 
-            "error": "Timeout detectando EUI (puede estar descargando la imagen Docker)",
-            "output": "El comando tardó más de 2 minutos. Si es la primera vez, intenta de nuevo."
-        })
-    except FileNotFoundError:
-        return jsonify({"success": False, "error": "Docker no instalado", "output": ""})
-    except Exception as e:
-        logging.error("Error detecting gateway EUI: %s", e)
-        return jsonify({"success": False, "error": str(e), "output": ""})
+    
+    return jsonify({
+        "running": running,
+        "logs": logs,
+        "eui": eui,
+        "complete": not running and "=== Comando completado ===" in logs
+    })
 
 
 @web.route("/api/gateway/config", methods=["GET"])

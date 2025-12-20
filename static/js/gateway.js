@@ -244,9 +244,15 @@ async function checkContainerStatus() {
 async function detectEui() {
     const btn = document.getElementById('detectEuiBtn');
     const euiSpan = document.getElementById('gatewayEui');
+    const logsSection = document.getElementById('logsSection');
+    const logsDiv = document.getElementById('containerLogs');
     
     btn.disabled = true;
-    euiSpan.innerHTML = '<span class="loading-eui"><span class="spinner-small"></span> Detectando... (puede tardar 1-2 min)</span>';
+    euiSpan.innerHTML = '<span class="loading-eui"><span class="spinner-small"></span> Detectando...</span>';
+    
+    // Mostrar sección de logs
+    logsSection.style.display = 'block';
+    logsDiv.textContent = 'Iniciando detección de EUI...\n';
     
     try {
         const response = await fetch('/api/gateway/detect-eui', {
@@ -254,35 +260,65 @@ async function detectEui() {
         });
         const data = await response.json();
         
-        if (data.success && data.eui) {
-            euiSpan.textContent = data.eui;
-            showNotification('Gateway EUI detectado: ' + data.eui, 'success');
+        if (data.success) {
+            // Iniciar polling de logs
+            pollEuiDetectionLogs(btn, euiSpan, logsDiv);
         } else {
             euiSpan.textContent = 'Error';
-            let errorMsg = data.error || 'No se pudo detectar el EUI';
-            
-            // Si hay output, mostrarlo en consola y notificación más detallada
-            if (data.output) {
-                console.log('Detect EUI output:', data.output);
-                errorMsg += '\n\nVer consola (F12) para más detalles.';
-            }
-            
-            showNotification(errorMsg, 'error');
-            
-            // Mostrar output en los logs si la sección está visible
-            const logsSection = document.getElementById('logsSection');
-            const logsDiv = document.getElementById('containerLogs');
-            if (data.output) {
-                logsSection.style.display = 'block';
-                logsDiv.textContent = '=== Output de detección EUI ===\n\n' + data.output;
-            }
+            logsDiv.textContent = 'Error: ' + data.error;
+            showNotification(data.error, 'error');
+            btn.disabled = false;
         }
     } catch (error) {
         euiSpan.textContent = 'Error';
+        logsDiv.textContent = 'Error de conexión: ' + error.message;
         showNotification('Error de conexion: ' + error.message, 'error');
+        btn.disabled = false;
+    }
+}
+
+let euiPollInterval = null;
+
+async function pollEuiDetectionLogs(btn, euiSpan, logsDiv) {
+    if (euiPollInterval) {
+        clearInterval(euiPollInterval);
     }
     
-    btn.disabled = false;
+    let lastLength = 0;
+    
+    euiPollInterval = setInterval(async () => {
+        try {
+            const response = await fetch('/api/gateway/detect-eui/status');
+            const data = await response.json();
+            
+            // Actualizar logs
+            if (data.logs && data.logs.length > lastLength) {
+                logsDiv.textContent = data.logs;
+                lastLength = data.logs.length;
+                logsDiv.scrollTop = logsDiv.scrollHeight;
+            }
+            
+            // Si terminó
+            if (!data.running && data.complete) {
+                clearInterval(euiPollInterval);
+                euiPollInterval = null;
+                
+                if (data.eui) {
+                    euiSpan.textContent = data.eui;
+                    logsDiv.textContent += '\n\n✅ EUI detectado: ' + data.eui;
+                    showNotification('Gateway EUI detectado: ' + data.eui, 'success');
+                } else {
+                    euiSpan.textContent = 'No detectado';
+                    logsDiv.textContent += '\n\n❌ No se encontró EUI. Verifica que el concentrador LoRa esté conectado.';
+                    showNotification('No se pudo detectar el EUI', 'error');
+                }
+                
+                btn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error polling EUI status:', error);
+        }
+    }, 1000);
 }
 
 function copyEui() {
