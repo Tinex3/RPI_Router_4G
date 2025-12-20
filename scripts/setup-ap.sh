@@ -4,9 +4,16 @@
 
 set -e
 
+# Configurar logging
+LOGFILE="/var/log/setup-ap-$(date +%Y%m%d-%H%M%S).log"
+exec > >(tee -a "$LOGFILE")
+exec 2>&1
+
 echo "╔════════════════════════════════════════════════════════════════════╗"
 echo "║         Configuración de Access Point WiFi                        ║"
 echo "╚════════════════════════════════════════════════════════════════════╝"
+echo ""
+echo "📝 Log guardado en: $LOGFILE"
 echo ""
 
 # Verificar root
@@ -289,6 +296,39 @@ fi
 
 systemctl unmask hostapd 2>/dev/null || true
 systemctl enable hostapd
+
+# Verificar si dnsmasq.service existe
+if [ ! -f /lib/systemd/system/dnsmasq.service ] && [ ! -f /etc/systemd/system/dnsmasq.service ]; then
+  echo "   ⚠️  dnsmasq.service no existe, creando servicio systemd..."
+  
+  # Crear servicio dnsmasq manualmente
+  cat > /etc/systemd/system/dnsmasq.service << 'EOF'
+[Unit]
+Description=dnsmasq - A lightweight DHCP and caching DNS server
+After=network.target
+Before=network-online.target
+
+[Service]
+Type=forking
+PIDFile=/run/dnsmasq/dnsmasq.pid
+ExecStartPre=/usr/sbin/dnsmasq --test
+ExecStart=/usr/sbin/dnsmasq -x /run/dnsmasq/dnsmasq.pid -u dnsmasq -7 /etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new --local-service
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  
+  # Crear directorio para PID
+  mkdir -p /run/dnsmasq
+  chown dnsmasq:nogroup /run/dnsmasq 2>/dev/null || true
+  
+  systemctl daemon-reload
+  echo "   ✅ Servicio dnsmasq.service creado"
+fi
+
 systemctl enable dnsmasq
 
 echo "   ✅ hostapd y dnsmasq habilitados para arranque automático"
@@ -338,7 +378,9 @@ echo "╔═══════════════════════�
 echo "║              ✅ CONFIGURACIÓN COMPLETADA                          ║"
 echo "╚════════════════════════════════════════════════════════════════════╝"
 echo ""
-echo "📡 Red WiFi creada:"
+echo "� Log completo guardado en: $LOGFILE"
+echo ""
+echo "�📡 Red WiFi creada:"
 echo "   SSID: RPI_Router_4G"
 echo "   Password: router4g2024"
 echo "   IP Gateway: 192.168.50.1"
