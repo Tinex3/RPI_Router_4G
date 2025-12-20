@@ -43,15 +43,29 @@ def send_at(cmd: str) -> str | None:
         logger.error("No hay puerto AT disponible")
         return None
     try:
-        with serial.Serial(port, BAUDRATE, timeout=2) as s:
-            s.write((cmd + "\r").encode())
-            time.sleep(0.4)
-            response = s.read(512).decode(errors="ignore")
-            logger.debug(f"AT command {cmd}: {response[:50]}...")
-            return response
+        with serial.Serial(port, BAUDRATE, timeout=2, rtscts=False, dsrdtr=False) as s:
+            # Limpiar buffers
+            s.reset_input_buffer()
+            s.reset_output_buffer()
+            
+            # Enviar comando
+            s.write((cmd + "\r\n").encode())
+            time.sleep(0.5)
+            
+            # Leer respuesta completa
+            response = ""
+            for _ in range(5):
+                chunk = s.read(s.in_waiting or 128).decode(errors="ignore")
+                response += chunk
+                if "OK" in response or "ERROR" in response:
+                    break
+                time.sleep(0.1)
+            
+            logger.debug(f"AT {cmd}: {response[:80]}...")
+            return response if response else None
     except Exception as e:
         logger.error(f"Error enviando comando AT {cmd}: {e}")
-        return f"Error: {e}"
+        return None
 
 def get_signal():
     """Obtiene señal CSQ y QCSQ"""
