@@ -904,13 +904,20 @@ def api_gateway_detect_eui_status():
     
     # Buscar EUI en los logs si ya terminó
     if not running and logs:
-        eui_match = re.search(r'([0-9A-Fa-f]{16})', logs)
+        # Buscar formato "Gateway EUI: XXXX" o solo 16 hex chars
+        eui_match = re.search(r'Gateway EUI:\s*([0-9A-Fa-f]{16})', logs)
+        if not eui_match:
+            # Fallback: buscar cualquier secuencia de 16 hex
+            eui_match = re.search(r'\b([0-9A-Fa-f]{16})\b', logs)
         if eui_match:
             eui = eui_match.group(1).upper()
+            logging.info("EUI detectado: %s", eui)
             # Guardar en config
             config = read_gateway_config()
             config["gateway_eui"] = eui
             save_gateway_config(config)
+        else:
+            logging.warning("No se encontró EUI en logs: %s", logs[:200])
     
     return jsonify({
         "running": running,
