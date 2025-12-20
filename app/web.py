@@ -98,11 +98,26 @@ def dashboard():
 def network_config():
     return render_template("network.html", username=current_user.username)
 
+
 @web.route("/settings")
 @login_required
 def settings():
+    from .auth import get_env_password
     cfg = load_config()
-    return render_template("settings.html", cfg=cfg, username=current_user.username)
+    web_password = get_env_password()
+    return render_template("settings.html", cfg=cfg, username=current_user.username, web_password=web_password)
+
+@web.route("/api/web-password", methods=["POST"])
+@login_required
+def api_set_web_password():
+    from .auth import set_env_password
+    data = request.json
+    new_password = data.get("password", "").strip()
+    if not new_password:
+        return jsonify({"ok": False, "error": "La contraseña no puede estar vacía"}), 400
+    set_env_password(new_password)
+    logging.info("Web password changed by %s", current_user.username)
+    return jsonify({"ok": True})
 
 @web.route("/api/signal")
 @login_required

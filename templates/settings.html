@@ -44,7 +44,59 @@
     <button class="btn" onclick="saveAPN()">Guardar APN</button>
     <div id="apn-status" class="status-msg"></div>
   </div>
+
+  <div class="card">
+    <h2>
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px;">
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M12 16v-4"></path>
+        <path d="M12 8h.01"></path>
+      </svg>
+      Contraseña de acceso Web
+    </h2>
+    <div class="form-group">
+      <label for="webPassword">Contraseña actual</label>
+      <input id="webPassword" class="input" type="password" value="{{ web_password }}" readonly>
+    </div>
+    <div class="form-group">
+      <label for="newWebPassword">Nueva contraseña</label>
+      <input id="newWebPassword" class="input" type="password" placeholder="Nueva contraseña">
+    </div>
+    <button class="btn" onclick="changeWebPassword()">Cambiar contraseña</button>
+    <div id="webpass-status" class="status-msg"></div>
+  </div>
 </div>
 
 <script src="/static/js/settings.js"></script>
+<script>
+async function changeWebPassword() {
+  const newPass = document.getElementById('newWebPassword').value.trim();
+  const statusEl = document.getElementById('webpass-status');
+  if (!newPass) {
+    statusEl.textContent = 'La contraseña no puede estar vacía';
+    statusEl.className = 'status-msg error';
+    return;
+  }
+  try {
+    const resp = await fetch('/api/web-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: newPass })
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      statusEl.textContent = 'Contraseña actualizada correctamente';
+      statusEl.className = 'status-msg success';
+      document.getElementById('webPassword').value = newPass;
+      document.getElementById('newWebPassword').value = '';
+    } else {
+      statusEl.textContent = data.error || 'Error al actualizar contraseña';
+      statusEl.className = 'status-msg error';
+    }
+  } catch (e) {
+    statusEl.textContent = 'Error de conexión';
+    statusEl.className = 'status-msg error';
+  }
+}
+</script>
 {% endblock %}
