@@ -673,26 +673,87 @@ def api_gateway_docker_status():
 @web.route("/api/gateway/install-docker", methods=["POST"])
 @login_required
 def api_gateway_install_docker():
-    """Instala Docker"""
+    """Inicia instalacion de Docker en background"""
     logging.warning("Docker installation requested by %s", current_user.username)
+    
+    log_file = "/tmp/docker-install.log"
+    pid_file = "/tmp/docker-install.pid"
+    
+    # Verificar si ya hay una instalacion en progreso
+    if os.path.exists(pid_file):
+        try:
+            with open(pid_file, "r") as f:
+                pid = int(f.read().strip())
+            # Verificar si el proceso sigue corriendo
+            os.kill(pid, 0)
+            return jsonify({"success": True, "status": "running", "message": "Instalacion en progreso"})
+        except (ProcessLookupError, ValueError):
+            # Proceso terminado, limpiar
+            os.remove(pid_file)
+    
     try:
         script_path = "/opt/ec25-router/scripts/setup-docker.sh"
-        result = subprocess.run(
+        
+        # Limpiar log anterior
+        with open(log_file, "w") as f:
+            f.write("=== Iniciando instalacion de Docker ===\n")
+            f.write(f"Fecha: {subprocess.check_output(['date'], text=True)}\n")
+        
+        # Ejecutar en background
+        process = subprocess.Popen(
             ["sudo", "bash", script_path],
-            capture_output=True,
-            text=True,
-            timeout=600  # 10 minutos max
+            stdout=open(log_file, "a"),
+            stderr=subprocess.STDOUT,
+            start_new_session=True
         )
         
-        if result.returncode == 0:
-            return jsonify({"success": True, "output": result.stdout})
-        else:
-            return jsonify({"success": False, "error": result.stderr or result.stdout})
-    except subprocess.TimeoutExpired:
-        return jsonify({"success": False, "error": "Timeout - la instalacion tardo demasiado"})
+        # Guardar PID
+        with open(pid_file, "w") as f:
+            f.write(str(process.pid))
+        
+        return jsonify({"success": True, "status": "started", "pid": process.pid})
+        
     except Exception as e:
         logging.error("Error installing Docker: %s", e)
         return jsonify({"success": False, "error": str(e)})
+
+
+@web.route("/api/gateway/install-docker/status")
+@login_required
+def api_gateway_install_docker_status():
+    """Obtiene estado y logs de instalacion de Docker"""
+    log_file = "/tmp/docker-install.log"
+    pid_file = "/tmp/docker-install.pid"
+    
+    logs = ""
+    running = False
+    
+    # Leer logs
+    if os.path.exists(log_file):
+        try:
+            with open(log_file, "r") as f:
+                logs = f.read()
+        except:
+            pass
+    
+    # Verificar si sigue corriendo
+    if os.path.exists(pid_file):
+        try:
+            with open(pid_file, "r") as f:
+                pid = int(f.read().strip())
+            os.kill(pid, 0)  # Solo verifica si existe
+            running = True
+        except (ProcessLookupError, ValueError, FileNotFoundError):
+            running = False
+            # Limpiar pid file si el proceso termino
+            if os.path.exists(pid_file):
+                os.remove(pid_file)
+    
+    return jsonify({
+        "running": running,
+        "logs": logs,
+        "complete": not running and len(logs) > 100
+    })
 
 
 @web.route("/api/gateway/container-status")
@@ -740,17 +801,37 @@ def api_gateway_detect_eui():
     """Detecta el Gateway EUI del chip LoRa"""
     logging.info("Gateway EUI detection requested by %s", current_user.username)
     
+    # Verificar que SPI esté habilitado
+    if not check_spi_enabled():
+        return jsonify({
+            "success": False, 
+            "error": "El bus SPI no está habilitado. Habilítalo primero.",
+            "output": ""
+        })
+    
+    # Verificar que Docker esté instalado
     try:
+        subprocess.run(["docker", "--version"], capture_output=True, timeout=5)
+    except:
+        return jsonify({
+            "success": False,
+            "error": "Docker no está instalado",
+            "output": ""
+        })
+    
+    try:
+        logging.info("Ejecutando docker para detectar EUI...")
         result = subprocess.run(
-            ["docker", "run", "-it", "--privileged", "--rm", 
+            ["docker", "run", "--privileged", "--rm", 
              "-e", "GATEWAY_EUI_SOURCE=chip",
              "xoseperez/basicstation:latest", "gateway_eui"],
             capture_output=True,
             text=True,
-            timeout=60
+            timeout=120  # 2 minutos para descargar imagen si es necesario
         )
         
-        output = result.stdout + result.stderr
+        output = result.stdout + "\n" + result.stderr
+        logging.info("Docker output: %s", output[:500])
         
         # Buscar el EUI en la salida (formato: 16 caracteres hex)
         eui_match = re.search(r'([0-9A-Fa-f]{16})', output)
@@ -763,21 +844,25 @@ def api_gateway_detect_eui():
             config["gateway_eui"] = eui
             save_gateway_config(config)
             
-            return jsonify({"success": True, "eui": eui})
+            return jsonify({"success": True, "eui": eui, "output": output})
         else:
             return jsonify({
                 "success": False, 
-                "error": "No se pudo detectar el EUI",
+                "error": "No se pudo detectar el EUI. Verifica que el concentrador LoRa esté conectado.",
                 "output": output
             })
             
     except subprocess.TimeoutExpired:
-        return jsonify({"success": False, "error": "Timeout detectando EUI"})
+        return jsonify({
+            "success": False, 
+            "error": "Timeout detectando EUI (puede estar descargando la imagen Docker)",
+            "output": "El comando tardó más de 2 minutos. Si es la primera vez, intenta de nuevo."
+        })
     except FileNotFoundError:
-        return jsonify({"success": False, "error": "Docker no instalado"})
+        return jsonify({"success": False, "error": "Docker no instalado", "output": ""})
     except Exception as e:
         logging.error("Error detecting gateway EUI: %s", e)
-        return jsonify({"success": False, "error": str(e)})
+        return jsonify({"success": False, "error": str(e), "output": ""})
 
 
 @web.route("/api/gateway/config", methods=["GET"])

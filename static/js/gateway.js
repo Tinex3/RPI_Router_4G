@@ -112,9 +112,10 @@ async function installDocker() {
     
     modal.classList.add('active');
     closeBtn.disabled = true;
-    logsDiv.textContent = 'Iniciando instalacion de Docker...\nEste proceso puede tomar varios minutos.\n\n';
+    logsDiv.textContent = 'Iniciando instalacion de Docker...\n';
     
     try {
+        // Iniciar instalacion
         const response = await fetch('/api/gateway/install-docker', {
             method: 'POST'
         });
@@ -122,26 +123,78 @@ async function installDocker() {
         const data = await response.json();
         
         if (data.success) {
-            logsDiv.textContent += data.output + '\n\n';
-            logsDiv.textContent += '✅ Docker instalado correctamente!\n';
-            logsDiv.textContent += '\n⚠️ IMPORTANTE: Debes cerrar sesion y volver a iniciar,\n';
-            logsDiv.textContent += '   o reiniciar el sistema para usar Docker sin sudo.\n';
-            showNotification('Docker instalado correctamente', 'success');
-            
-            // Actualizar estado
-            setTimeout(() => {
-                checkDockerStatus();
-            }, 2000);
+            // Iniciar polling de logs
+            pollDockerInstallLogs(logsDiv, closeBtn);
         } else {
             logsDiv.textContent += '❌ Error: ' + data.error + '\n';
-            showNotification('Error instalando Docker', 'error');
+            closeBtn.disabled = false;
         }
     } catch (error) {
         logsDiv.textContent += '❌ Error de conexion: ' + error.message + '\n';
-        showNotification('Error de conexion', 'error');
+        closeBtn.disabled = false;
+    }
+}
+
+let dockerPollInterval = null;
+
+async function pollDockerInstallLogs(logsDiv, closeBtn) {
+    // Limpiar intervalo anterior si existe
+    if (dockerPollInterval) {
+        clearInterval(dockerPollInterval);
     }
     
-    closeBtn.disabled = false;
+    let lastLength = 0;
+    
+    dockerPollInterval = setInterval(async () => {
+        try {
+            const response = await fetch('/api/gateway/install-docker/status');
+            const data = await response.json();
+            
+            // Actualizar logs solo si hay contenido nuevo
+            if (data.logs && data.logs.length > lastLength) {
+                logsDiv.textContent = data.logs;
+                lastLength = data.logs.length;
+                // Auto-scroll al final
+                logsDiv.scrollTop = logsDiv.scrollHeight;
+            }
+            
+            // Si termino, detener polling
+            if (!data.running && data.complete) {
+                clearInterval(dockerPollInterval);
+                dockerPollInterval = null;
+                
+                // Verificar si fue exitoso
+                if (data.logs.includes('DOCKER INSTALADO CORRECTAMENTE') || 
+                    data.logs.includes('Docker ya esta instalado')) {
+                    logsDiv.textContent += '\n\n✅ Instalacion completada!\n';
+                    logsDiv.textContent += '⚠️ IMPORTANTE: Debes cerrar sesion y volver a iniciar,\n';
+                    logsDiv.textContent += '   o reiniciar el sistema para usar Docker sin sudo.\n';
+                    showNotification('Docker instalado correctamente', 'success');
+                    
+                    // Actualizar estado despues de un momento
+                    setTimeout(() => {
+                        checkDockerStatus();
+                    }, 2000);
+                } else if (data.logs.includes('[ERROR]')) {
+                    logsDiv.textContent += '\n\n❌ La instalacion tuvo errores.\n';
+                    showNotification('Error en instalacion de Docker', 'error');
+                }
+                
+                closeBtn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error polling logs:', error);
+        }
+    }, 1000); // Polling cada segundo
+}
+
+// Cerrar modal y limpiar
+function closeDockerModal() {
+    if (dockerPollInterval) {
+        clearInterval(dockerPollInterval);
+        dockerPollInterval = null;
+    }
+    document.getElementById('dockerInstallModal').classList.remove('active');
 }
 
 // =====================================================================
@@ -193,7 +246,7 @@ async function detectEui() {
     const euiSpan = document.getElementById('gatewayEui');
     
     btn.disabled = true;
-    euiSpan.innerHTML = '<span class="loading-eui"><span class="spinner-small"></span> Detectando...</span>';
+    euiSpan.innerHTML = '<span class="loading-eui"><span class="spinner-small"></span> Detectando... (puede tardar 1-2 min)</span>';
     
     try {
         const response = await fetch('/api/gateway/detect-eui', {
@@ -206,11 +259,27 @@ async function detectEui() {
             showNotification('Gateway EUI detectado: ' + data.eui, 'success');
         } else {
             euiSpan.textContent = 'Error';
-            showNotification(data.error || 'No se pudo detectar el EUI', 'error');
+            let errorMsg = data.error || 'No se pudo detectar el EUI';
+            
+            // Si hay output, mostrarlo en consola y notificación más detallada
+            if (data.output) {
+                console.log('Detect EUI output:', data.output);
+                errorMsg += '\n\nVer consola (F12) para más detalles.';
+            }
+            
+            showNotification(errorMsg, 'error');
+            
+            // Mostrar output en los logs si la sección está visible
+            const logsSection = document.getElementById('logsSection');
+            const logsDiv = document.getElementById('containerLogs');
+            if (data.output) {
+                logsSection.style.display = 'block';
+                logsDiv.textContent = '=== Output de detección EUI ===\n\n' + data.output;
+            }
         }
     } catch (error) {
         euiSpan.textContent = 'Error';
-        showNotification('Error de conexion', 'error');
+        showNotification('Error de conexion: ' + error.message, 'error');
     }
     
     btn.disabled = false;
