@@ -1,0 +1,34 @@
+services:
+  basicstation:
+    image: xoseperez/basicstation:latest
+    container_name: basicstation
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    environment:
+      # Configuracion del chip LoRa
+      CLKSRC: 1
+      SPI_SPEED: 8000000
+      DISABLE_DUTY_CYCLE_CHECK: 1
+      DISABLE_DWELL_TIME_LIMITS: 1
+      
+      # Configuracion GPS (1=habilitado, 0=deshabilitado)
+      HAS_GPS: 1
+      GPS_DEV: "/dev/ttyAMA0"
+      
+      # Configuracion GPIO
+      USE_LIBGPIO: 1
+      GPIO_CHIP: "gpiochip0"
+      RESET_GPIO: "17"
+      
+      # Modelo del concentrador
+      MODEL: "SX1302"
+      INTERFACE: "SPI"
+      DESIGN: "CORECELL"
+      DEVICE: "/dev/spidev0.0"
+      
+      # Configuracion del servidor LoRaWAN (The Things Network)
+      # Estos valores deben ser configurados desde la interfaz web
+      TC_URI: "${TC_URI:-wss://eu1.cloud.thethings.network:8887}"
+      GATEWAY_EUI: "${GATEWAY_EUI:-0000000000000000}"
+      TC_KEY: "${TC_KEY:-YOUR_LNS_KEY_HERE}"

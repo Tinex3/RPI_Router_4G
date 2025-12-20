@@ -474,3 +474,363 @@ def api_system_info():
 def restarting():
     """Pagina de reinicio"""
     return render_template("restarting.html")
+
+
+# ============== Gateway LoRaWAN Configuration ==============
+
+BASICSTATION_DIR = "/opt/ec25-router/BasicStation"
+BASICSTATION_ENV = os.path.join(BASICSTATION_DIR, ".env")
+BASICSTATION_COMPOSE = os.path.join(BASICSTATION_DIR, "docker-compose.yml")
+
+
+def read_gateway_config():
+    """Lee configuracion del gateway desde .env"""
+    config = {
+        "gateway_eui": "0000000000000000",
+        "tc_uri": "wss://eu1.cloud.thethings.network:8887",
+        "tc_key": "",
+        "has_gps": "1"
+    }
+    
+    try:
+        if os.path.exists(BASICSTATION_ENV):
+            with open(BASICSTATION_ENV, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        key, value = line.split("=", 1)
+                        key_lower = key.lower()
+                        if key_lower in config:
+                            config[key_lower] = value
+    except Exception as e:
+        logging.error("Error reading gateway config: %s", e)
+    
+    return config
+
+
+def save_gateway_config(config):
+    """Guarda configuracion del gateway en .env"""
+    try:
+        os.makedirs(BASICSTATION_DIR, exist_ok=True)
+        
+        content = """# Configuracion de BasicStation LoRaWAN Gateway
+# Este archivo es generado automaticamente por la interfaz web
+# No editar manualmente
+
+# Gateway EUI (obtenido del chip)
+GATEWAY_EUI={gateway_eui}
+
+# Servidor LNS (The Things Network, ChirpStack, etc)
+TC_URI={tc_uri}
+TC_KEY={tc_key}
+
+# GPS (1=habilitado, 0=deshabilitado)
+HAS_GPS={has_gps}
+""".format(**config)
+        
+        with open(BASICSTATION_ENV, "w") as f:
+            f.write(content)
+        
+        # Actualizar docker-compose.yml con los valores
+        update_docker_compose(config)
+        
+        return True
+    except Exception as e:
+        logging.error("Error saving gateway config: %s", e)
+        return False
+
+
+def update_docker_compose(config):
+    """Actualiza docker-compose.yml con la configuracion actual"""
+    compose_content = """services:
+  basicstation:
+    image: xoseperez/basicstation:latest
+    container_name: basicstation
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    environment:
+      # Configuracion del chip LoRa
+      CLKSRC: 1
+      SPI_SPEED: 8000000
+      DISABLE_DUTY_CYCLE_CHECK: 1
+      DISABLE_DWELL_TIME_LIMITS: 1
+      
+      # Configuracion GPS (1=habilitado, 0=deshabilitado)
+      HAS_GPS: {has_gps}
+      GPS_DEV: "/dev/ttyAMA0"
+      
+      # Configuracion GPIO
+      USE_LIBGPIO: 1
+      GPIO_CHIP: "gpiochip0"
+      RESET_GPIO: "17"
+      
+      # Modelo del concentrador
+      MODEL: "SX1302"
+      INTERFACE: "SPI"
+      DESIGN: "CORECELL"
+      DEVICE: "/dev/spidev0.0"
+      
+      # Configuracion del servidor LoRaWAN
+      TC_URI: "{tc_uri}"
+      GATEWAY_EUI: "{gateway_eui}"
+      TC_KEY: "{tc_key}"
+""".format(**config)
+    
+    with open(BASICSTATION_COMPOSE, "w") as f:
+        f.write(compose_content)
+
+
+@web.route("/gateway")
+@login_required
+def gateway_config_page():
+    """Pagina de configuracion del gateway LoRaWAN"""
+    return render_template("gateway_config.html", username=current_user.username)
+
+
+@web.route("/api/gateway/docker-status")
+@login_required
+def api_gateway_docker_status():
+    """Verifica si Docker esta instalado"""
+    try:
+        result = subprocess.run(
+            ["docker", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            version = result.stdout.strip()
+            return jsonify({"installed": True, "version": version})
+        else:
+            return jsonify({"installed": False})
+    except FileNotFoundError:
+        return jsonify({"installed": False})
+    except Exception as e:
+        return jsonify({"installed": False, "error": str(e)})
+
+
+@web.route("/api/gateway/install-docker", methods=["POST"])
+@login_required
+def api_gateway_install_docker():
+    """Instala Docker"""
+    logging.warning("Docker installation requested by %s", current_user.username)
+    try:
+        script_path = "/opt/ec25-router/scripts/setup-docker.sh"
+        result = subprocess.run(
+            ["sudo", "bash", script_path],
+            capture_output=True,
+            text=True,
+            timeout=600  # 10 minutos max
+        )
+        
+        if result.returncode == 0:
+            return jsonify({"success": True, "output": result.stdout})
+        else:
+            return jsonify({"success": False, "error": result.stderr or result.stdout})
+    except subprocess.TimeoutExpired:
+        return jsonify({"success": False, "error": "Timeout - la instalacion tardo demasiado"})
+    except Exception as e:
+        logging.error("Error installing Docker: %s", e)
+        return jsonify({"success": False, "error": str(e)})
+
+
+@web.route("/api/gateway/container-status")
+@login_required
+def api_gateway_container_status():
+    """Verifica estado del contenedor BasicStation"""
+    config = read_gateway_config()
+    
+    try:
+        # Verificar si el contenedor existe
+        result = subprocess.run(
+            ["docker", "ps", "-a", "--filter", "name=basicstation", "--format", "{{.Status}}"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        status = result.stdout.strip()
+        
+        if not status:
+            return jsonify({
+                "exists": False,
+                "running": False,
+                "gateway_eui": config.get("gateway_eui")
+            })
+        
+        running = status.startswith("Up")
+        
+        return jsonify({
+            "exists": True,
+            "running": running,
+            "status": status,
+            "gateway_eui": config.get("gateway_eui")
+        })
+        
+    except FileNotFoundError:
+        return jsonify({"exists": False, "running": False, "error": "Docker no instalado"})
+    except Exception as e:
+        return jsonify({"exists": False, "running": False, "error": str(e)})
+
+
+@web.route("/api/gateway/detect-eui", methods=["POST"])
+@login_required
+def api_gateway_detect_eui():
+    """Detecta el Gateway EUI del chip LoRa"""
+    logging.info("Gateway EUI detection requested by %s", current_user.username)
+    
+    try:
+        result = subprocess.run(
+            ["docker", "run", "-it", "--privileged", "--rm", 
+             "-e", "GATEWAY_EUI_SOURCE=chip",
+             "xoseperez/basicstation:latest", "gateway_eui"],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        
+        output = result.stdout + result.stderr
+        
+        # Buscar el EUI en la salida (formato: 16 caracteres hex)
+        eui_match = re.search(r'([0-9A-Fa-f]{16})', output)
+        
+        if eui_match:
+            eui = eui_match.group(1).upper()
+            
+            # Guardar en la config
+            config = read_gateway_config()
+            config["gateway_eui"] = eui
+            save_gateway_config(config)
+            
+            return jsonify({"success": True, "eui": eui})
+        else:
+            return jsonify({
+                "success": False, 
+                "error": "No se pudo detectar el EUI",
+                "output": output
+            })
+            
+    except subprocess.TimeoutExpired:
+        return jsonify({"success": False, "error": "Timeout detectando EUI"})
+    except FileNotFoundError:
+        return jsonify({"success": False, "error": "Docker no instalado"})
+    except Exception as e:
+        logging.error("Error detecting gateway EUI: %s", e)
+        return jsonify({"success": False, "error": str(e)})
+
+
+@web.route("/api/gateway/config", methods=["GET"])
+@login_required
+def api_gateway_config_get():
+    """Obtiene configuracion del gateway"""
+    config = read_gateway_config()
+    return jsonify({"success": True, "config": config})
+
+
+@web.route("/api/gateway/config", methods=["POST"])
+@login_required
+def api_gateway_config_post():
+    """Guarda configuracion del gateway"""
+    try:
+        data = request.json
+        
+        config = {
+            "gateway_eui": data.get("gateway_eui", "0000000000000000"),
+            "tc_uri": data.get("tc_uri", ""),
+            "tc_key": data.get("tc_key", ""),
+            "has_gps": data.get("has_gps", "1")
+        }
+        
+        if save_gateway_config(config):
+            logging.info("Gateway config updated by %s", current_user.username)
+            return jsonify({"success": True})
+        else:
+            return jsonify({"success": False, "error": "Error guardando configuracion"})
+            
+    except Exception as e:
+        logging.error("Error saving gateway config: %s", e)
+        return jsonify({"success": False, "error": str(e)})
+
+
+@web.route("/api/gateway/start", methods=["POST"])
+@login_required
+def api_gateway_start():
+    """Inicia el contenedor BasicStation"""
+    logging.info("BasicStation start requested by %s", current_user.username)
+    
+    try:
+        # Usar docker-compose up
+        result = subprocess.run(
+            ["docker", "compose", "-f", BASICSTATION_COMPOSE, "up", "-d"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=BASICSTATION_DIR
+        )
+        
+        if result.returncode == 0:
+            return jsonify({"success": True})
+        else:
+            # Intentar con docker-compose (guion)
+            result = subprocess.run(
+                ["docker-compose", "-f", BASICSTATION_COMPOSE, "up", "-d"],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                cwd=BASICSTATION_DIR
+            )
+            
+            if result.returncode == 0:
+                return jsonify({"success": True})
+            else:
+                return jsonify({"success": False, "error": result.stderr or result.stdout})
+                
+    except Exception as e:
+        logging.error("Error starting BasicStation: %s", e)
+        return jsonify({"success": False, "error": str(e)})
+
+
+@web.route("/api/gateway/stop", methods=["POST"])
+@login_required
+def api_gateway_stop():
+    """Detiene el contenedor BasicStation"""
+    logging.info("BasicStation stop requested by %s", current_user.username)
+    
+    try:
+        result = subprocess.run(
+            ["docker", "stop", "basicstation"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode == 0:
+            return jsonify({"success": True})
+        else:
+            return jsonify({"success": False, "error": result.stderr or result.stdout})
+            
+    except Exception as e:
+        logging.error("Error stopping BasicStation: %s", e)
+        return jsonify({"success": False, "error": str(e)})
+
+
+@web.route("/api/gateway/logs")
+@login_required
+def api_gateway_logs():
+    """Obtiene logs del contenedor BasicStation"""
+    try:
+        result = subprocess.run(
+            ["docker", "logs", "--tail", "100", "basicstation"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        logs = result.stdout + result.stderr
+        return jsonify({"success": True, "logs": logs})
+        
+    except FileNotFoundError:
+        return jsonify({"success": False, "error": "Docker no instalado"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})

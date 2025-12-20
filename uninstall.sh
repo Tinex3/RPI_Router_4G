@@ -22,6 +22,8 @@ echo "   - Configuraciones de hostapd y dnsmasq"
 echo "   - Reglas iptables del AP"
 echo "   - Directorio /opt/ec25-router"
 echo "   - Logs en /var/log/ec25-router"
+echo "   - Contenedor BasicStation (Docker)"
+echo "   - Carpeta BasicStation"
 echo ""
 read -p "Continuar con la desinstalacion? (y/n) " -n 1 -r
 echo
@@ -31,7 +33,7 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 echo ""
-echo "[1/8] Deteniendo servicios..."
+echo "[1/10] Deteniendo servicios del proyecto..."
 systemctl stop ec25-router 2>/dev/null || true
 systemctl stop wan-manager 2>/dev/null || true
 systemctl stop watchdog 2>/dev/null || true
@@ -41,7 +43,7 @@ systemctl stop wlan0-ap 2>/dev/null || true
 echo "   [OK] Servicios detenidos"
 
 echo ""
-echo "[2/8] Deshabilitando servicios..."
+echo "[2/10] Deshabilitando servicios..."
 systemctl disable ec25-router 2>/dev/null || true
 systemctl disable wan-manager 2>/dev/null || true
 systemctl disable watchdog 2>/dev/null || true
@@ -51,7 +53,7 @@ systemctl disable wlan0-ap 2>/dev/null || true
 echo "   [OK] Servicios deshabilitados"
 
 echo ""
-echo "[3/8] Eliminando archivos de servicios systemd..."
+echo "[3/10] Eliminando archivos de servicios systemd..."
 rm -f /etc/systemd/system/ec25-router.service
 rm -f /etc/systemd/system/wan-manager.service
 rm -f /etc/systemd/system/watchdog.service
@@ -62,7 +64,7 @@ systemctl daemon-reload
 echo "   [OK] Servicios systemd eliminados"
 
 echo ""
-echo "[4/8] Eliminando configuraciones de red..."
+echo "[4/10] Eliminando configuraciones de red..."
 # Eliminar configuracion de NetworkManager para wlan0
 rm -f /etc/NetworkManager/conf.d/unmanaged-wlan0.conf
 # Eliminar configuracion de interfaces
@@ -86,7 +88,7 @@ fi
 echo "   [OK] Configuraciones de red eliminadas"
 
 echo ""
-echo "[5/8] Limpiando reglas iptables del AP..."
+echo "[5/10] Limpiando reglas iptables del AP..."
 # Eliminar reglas NAT
 iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || true
 iptables -t nat -D POSTROUTING -o usb0 -j MASQUERADE 2>/dev/null || true
@@ -102,7 +104,7 @@ iptables-save > /etc/iptables.rules 2>/dev/null || true
 echo "   [OK] Reglas iptables limpiadas"
 
 echo ""
-echo "[6/8] Liberando interfaz wlan0..."
+echo "[6/10] Liberando interfaz wlan0..."
 ip addr flush dev wlan0 2>/dev/null || true
 ip link set wlan0 down 2>/dev/null || true
 # Reiniciar NetworkManager para que retome control de wlan0
@@ -110,15 +112,51 @@ systemctl restart NetworkManager 2>/dev/null || true
 echo "   [OK] wlan0 liberada"
 
 echo ""
-echo "[7/8] Eliminando directorio de instalacion..."
+echo "[7/10] Deteniendo y eliminando contenedor BasicStation..."
+if command -v docker &> /dev/null; then
+  # Detener contenedor si existe
+  docker stop basicstation 2>/dev/null || true
+  # Eliminar contenedor
+  docker rm basicstation 2>/dev/null || true
+  # Preguntar si eliminar imagen
+  read -p "   Eliminar imagen Docker de BasicStation? (y/n) " -n 1 -r
+  echo
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    docker rmi xoseperez/basicstation:latest 2>/dev/null || true
+    echo "   [OK] Imagen BasicStation eliminada"
+  fi
+else
+  echo "   [INFO] Docker no instalado, saltando..."
+fi
+echo "   [OK] BasicStation limpiado"
+
+echo ""
+echo "[8/10] Eliminando directorio de instalacion..."
 rm -rf /opt/ec25-router
 echo "   [OK] /opt/ec25-router eliminado"
 
 echo ""
-echo "[8/8] Eliminando logs..."
+echo "[9/10] Eliminando logs..."
 rm -rf /var/log/ec25-router
 rm -f /var/log/setup-ap-*.log
 echo "   [OK] Logs eliminados"
+
+echo ""
+echo "[10/10] Desinstalar Docker? (opcional)"
+read -p "   Desinstalar Docker completamente? (y/n) " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo "   [INFO] Desinstalando Docker..."
+  systemctl stop docker 2>/dev/null || true
+  systemctl disable docker 2>/dev/null || true
+  apt-get purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin 2>/dev/null || true
+  apt-get autoremove -y 2>/dev/null || true
+  rm -rf /var/lib/docker
+  rm -rf /var/lib/containerd
+  echo "   [OK] Docker desinstalado"
+else
+  echo "   [INFO] Docker conservado"
+fi
 
 echo ""
 echo "========================================================================"
