@@ -483,6 +483,49 @@ BASICSTATION_ENV = os.path.join(BASICSTATION_DIR, ".env")
 BASICSTATION_COMPOSE = os.path.join(BASICSTATION_DIR, "docker-compose.yml")
 
 
+def check_spi_enabled():
+    """Verifica si el bus SPI esta habilitado"""
+    # Verificar si existen los dispositivos SPI
+    spi_devices = ["/dev/spidev0.0", "/dev/spidev0.1"]
+    for dev in spi_devices:
+        if os.path.exists(dev):
+            return True
+    return False
+
+
+def enable_spi():
+    """Habilita el bus SPI en la Raspberry Pi"""
+    try:
+        # Metodo 1: Usar raspi-config en modo no interactivo
+        result = subprocess.run(
+            ["sudo", "raspi-config", "nonint", "do_spi", "0"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode == 0:
+            return True, "SPI habilitado. Se requiere reiniciar para aplicar cambios."
+        
+        # Metodo 2: Modificar config.txt directamente
+        config_file = "/boot/config.txt"
+        if os.path.exists("/boot/firmware/config.txt"):
+            config_file = "/boot/firmware/config.txt"
+        
+        with open(config_file, "r") as f:
+            content = f.read()
+        
+        if "dtparam=spi=on" not in content:
+            with open(config_file, "a") as f:
+                f.write("\n# Enable SPI for LoRa concentrator\ndtparam=spi=on\n")
+            return True, "SPI habilitado en config.txt. Se requiere reiniciar."
+        else:
+            return True, "SPI ya esta configurado. Reinicia si no funciona."
+            
+    except Exception as e:
+        return False, str(e)
+
+
 def read_gateway_config():
     """Lee configuracion del gateway desde .env"""
     config = {
@@ -586,6 +629,23 @@ def update_docker_compose(config):
 def gateway_config_page():
     """Pagina de configuracion del gateway LoRaWAN"""
     return render_template("gateway_config.html", username=current_user.username)
+
+
+@web.route("/api/gateway/spi-status")
+@login_required
+def api_gateway_spi_status():
+    """Verifica si SPI esta habilitado"""
+    enabled = check_spi_enabled()
+    return jsonify({"enabled": enabled})
+
+
+@web.route("/api/gateway/enable-spi", methods=["POST"])
+@login_required
+def api_gateway_enable_spi():
+    """Habilita el bus SPI"""
+    logging.info("SPI enable requested by %s", current_user.username)
+    success, message = enable_spi()
+    return jsonify({"success": success, "message": message})
 
 
 @web.route("/api/gateway/docker-status")
@@ -758,6 +818,13 @@ def api_gateway_config_post():
 def api_gateway_start():
     """Inicia el contenedor BasicStation"""
     logging.info("BasicStation start requested by %s", current_user.username)
+    
+    # Verificar que SPI este habilitado
+    if not check_spi_enabled():
+        return jsonify({
+            "success": False, 
+            "error": "El bus SPI no esta habilitado. Habilitalo primero y reinicia el sistema."
+        })
     
     try:
         # Usar docker-compose up

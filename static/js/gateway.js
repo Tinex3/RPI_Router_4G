@@ -2,10 +2,76 @@
 // Maneja la configuracion de BasicStation
 
 document.addEventListener('DOMContentLoaded', function() {
+    checkSpiStatus();
     checkDockerStatus();
     checkContainerStatus();
     loadGatewayConfig();
 });
+
+// =====================================================================
+// SPI STATUS
+// =====================================================================
+
+async function checkSpiStatus() {
+    try {
+        const response = await fetch('/api/gateway/spi-status');
+        const data = await response.json();
+        
+        const statusDiv = document.getElementById('spiStatus');
+        const statusText = document.getElementById('spiStatusText');
+        const badge = document.getElementById('spiBadge');
+        const enableBtn = document.getElementById('enableSpiBtn');
+        
+        if (data.enabled) {
+            statusDiv.classList.remove('not-installed');
+            statusText.textContent = 'Bus SPI habilitado y funcionando (/dev/spidev0.0)';
+            badge.className = 'status-badge running';
+            badge.innerHTML = '<span class="status-dot"></span><span>Habilitado</span>';
+            enableBtn.style.display = 'none';
+        } else {
+            statusDiv.classList.add('not-installed');
+            statusText.textContent = 'SPI no esta habilitado. Es necesario para el concentrador LoRa.';
+            badge.className = 'status-badge stopped';
+            badge.innerHTML = '<span class="status-dot"></span><span>Deshabilitado</span>';
+            enableBtn.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error checking SPI status:', error);
+    }
+}
+
+async function enableSpi() {
+    const btn = document.getElementById('enableSpiBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-icon"><span class="spinner-small"></span> Habilitando...</span>';
+    
+    try {
+        const response = await fetch('/api/gateway/enable-spi', {
+            method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(data.message, 'success');
+            
+            // Si requiere reinicio, preguntar
+            if (data.message.includes('reiniciar') || data.message.includes('Reinicia')) {
+                if (confirm('SPI habilitado. Se requiere reiniciar para aplicar los cambios. ¿Reiniciar ahora?')) {
+                    window.location.href = '/api/system/restart';
+                }
+            }
+            
+            checkSpiStatus();
+        } else {
+            showNotification('Error: ' + data.message, 'error');
+        }
+    } catch (error) {
+        showNotification('Error de conexion', 'error');
+    }
+    
+    btn.disabled = false;
+    btn.innerHTML = '<span class="btn-icon"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Habilitar SPI</span>';
+}
 
 // =====================================================================
 // DOCKER STATUS

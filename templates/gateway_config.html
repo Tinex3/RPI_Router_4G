@@ -273,6 +273,28 @@
     <p>Configuracion de BasicStation para The Things Network</p>
 </div>
 
+<!-- Estado de SPI -->
+<div class="content-box docker-status" id="spiStatus">
+    <div class="flex-between">
+        <div>
+            <h3 style="margin: 0 0 0.25rem 0;">Bus SPI</h3>
+            <p style="margin: 0; color: var(--text-muted);" id="spiStatusText">Verificando...</p>
+        </div>
+        <span class="status-badge not-installed" id="spiBadge">
+            <span class="status-dot"></span>
+            <span>Verificando</span>
+        </span>
+    </div>
+    <button class="btn btn-warning install-docker-btn" id="enableSpiBtn" style="display: none;" onclick="enableSpi()">
+        <span class="btn-icon">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Habilitar SPI
+        </span>
+    </button>
+</div>
+
 <!-- Estado de Docker -->
 <div class="content-box docker-status" id="dockerStatus">
     <div class="flex-between">
