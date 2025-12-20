@@ -1,7 +1,7 @@
 from flask import Flask
 from flask_login import LoginManager
 from .web import web
-from .auth import get_user, ensure_password_hash
+from .auth import get_user
 from .logging_config import setup_logging
 import os
 
@@ -22,9 +22,6 @@ def create_app() -> Flask:
         # Si falla (permisos), usa logging por defecto
         import logging
         logging.basicConfig(level=logging.INFO)
-
-    # Asegura que exista password hash
-    ensure_password_hash()  # creates default hash if empty
 
     # Flask-Login setup
     login = LoginManager()

@@ -38,3 +38,7 @@ def authenticate(username: str, password: str) -> User | None:
     if username == "admin" and password == env_pass:
         return User(id="1", username=username)
     return None
+
+def get_user() -> User:
+    """Retorna el usuario admin"""
+    return User(id="1", username="admin")
