@@ -2,27 +2,54 @@
 {% block content %}
 <div class="grid">
   <div class="card">
-    <h2>WAN</h2>
-    <div id="wanStatus" class="big">–</div>
-    <div class="row">
+    <h2>🌐 WAN</h2>
+    <div id="wanStatus" class="status-badge">–</div>
+    <div class="row" style="margin-top: 16px;">
       <select id="wanMode" class="input">
-        <option value="auto">Auto</option>
-        <option value="eth">Ethernet</option>
-        <option value="lte">LTE</option>
+        <option value="auto">🔄 Auto</option>
+        <option value="eth">🔌 Ethernet</option>
+        <option value="lte">📡 LTE</option>
       </select>
       <button class="btn" onclick="saveWan()">Guardar</button>
     </div>
   </div>
 
   <div class="card">
-    <h2>Señal</h2>
-    <pre id="signal" class="pre">Cargando…</pre>
+    <h2>📶 Señal</h2>
+    <div id="signalStrength" class="signal-meter"></div>
+    <div id="signalDetails" class="info-list">
+      <div class="info-item">
+        <span class="label">CSQ:</span>
+        <span id="csq" class="value">–</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Calidad:</span>
+        <span id="qcsq" class="value">–</span>
+      </div>
+    </div>
   </div>
 
   <div class="card">
-    <h2>Módem</h2>
-    <button class="btn danger" onclick="resetModem()">Reset Modem</button>
-    <pre id="modem" class="pre">Cargando…</pre>
+    <h2>📱 Módem</h2>
+    <div id="modemInfo" class="info-list">
+      <div class="info-item">
+        <span class="label">Operador:</span>
+        <span id="operator" class="value">–</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Red:</span>
+        <span id="network" class="value">–</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Estado:</span>
+        <span id="registration" class="value">–</span>
+      </div>
+      <div class="info-item">
+        <span class="label">SIM:</span>
+        <span id="sim" class="value">–</span>
+      </div>
+    </div>
+    <button class="btn danger" onclick="resetModem()" style="margin-top: 16px; width: 100%;">🔄 Reiniciar Módem</button>
   </div>
 </div>
 

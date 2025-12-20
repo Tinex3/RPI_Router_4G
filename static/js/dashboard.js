@@ -1,24 +1,51 @@
 async function load() {
+  // WAN Status
   try {
     const wan = await (await fetch("/api/wan")).json();
-    document.getElementById("wanStatus").innerText = `${wan.active} (mode: ${wan.mode})`;
+    const statusEl = document.getElementById("wanStatus");
+    const statusText = wan.active === "down" ? "⚠️ Desconectado" : 
+                       wan.active === "eth" ? "🔌 Ethernet" : 
+                       wan.active === "lte" ? "📡 LTE" : wan.active;
+    statusEl.textContent = statusText;
+    statusEl.className = `status-badge status-${wan.active}`;
     document.getElementById("wanMode").value = wan.mode;
   } catch (e) {
-    document.getElementById("wanStatus").innerText = "Error cargando WAN";
+    document.getElementById("wanStatus").textContent = "❌ Error";
   }
 
+  // Signal
   try {
     const sig = await (await fetch("/api/signal")).json();
-    document.getElementById("signal").innerText = JSON.stringify(sig, null, 2);
+    document.getElementById("csq").textContent = sig.csq || "N/A";
+    document.getElementById("qcsq").textContent = sig.qcsq || "N/A";
+    
+    // Signal strength bar
+    const csqMatch = sig.csq?.match(/(\d+)\/31/);
+    if (csqMatch) {
+      const strength = parseInt(csqMatch[1]);
+      const percent = Math.round((strength / 31) * 100);
+      const color = strength >= 20 ? "#0f0" : strength >= 10 ? "#ff0" : "#f00";
+      document.getElementById("signalStrength").innerHTML = `
+        <div class="meter-bar">
+          <div class="meter-fill" style="width: ${percent}%; background: ${color};"></div>
+        </div>
+        <div class="meter-label">${percent}%</div>
+      `;
+    }
   } catch (e) {
-    document.getElementById("signal").innerText = "Error: Módem no detectado";
+    document.getElementById("csq").textContent = "Error";
+    document.getElementById("qcsq").textContent = "Módem no detectado";
   }
 
+  // Modem Info
   try {
     const info = await (await fetch("/api/modem/info")).json();
-    document.getElementById("modem").innerText = JSON.stringify(info, null, 2);
+    document.getElementById("operator").textContent = info.operator || "N/A";
+    document.getElementById("network").textContent = info.network || "N/A";
+    document.getElementById("registration").textContent = info.registration || "N/A";
+    document.getElementById("sim").textContent = info.sim || "N/A";
   } catch (e) {
-    document.getElementById("modem").innerText = "Error: No se pudo obtener info";
+    document.getElementById("operator").textContent = "Error";
   }
 }
 
