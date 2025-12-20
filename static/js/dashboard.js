@@ -25,6 +25,22 @@ async function loadSystemInfo() {
   }
 }
 
+async function checkEC25Availability() {
+  try {
+    const response = await fetch("/api/ec25/status");
+    const data = await response.json();
+    
+    // Si EC25 no está disponible (no detectado o deshabilitado), ocultar elementos
+    const ec25Elements = document.querySelectorAll('.ec25-only');
+    ec25Elements.forEach(el => {
+      el.style.display = data.available ? '' : 'none';
+    });
+  } catch (e) {
+    console.error("Error checking EC25 availability:", e);
+  }
+}
+
+
 async function load() {
   // WAN Status
   try {
@@ -168,5 +184,6 @@ async function runSpeedtest() {
 
 setInterval(load, 5000);
 setInterval(loadSystemInfo, 10000);
+checkEC25Availability();
 load();
 loadSystemInfo();

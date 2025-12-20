@@ -5,13 +5,51 @@ import os
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 
-from .modem import get_network_info, get_signal, set_apn, reset_modem
+from .modem import get_network_info, get_signal, set_apn, reset_modem, find_at_port
 from .config import load_config, save_config
 from .network import active_wan
 from .firewall import apply_firewall
 from .speedtest import run_speedtest
 
 web = Blueprint("web", __name__)
+
+# ============== EC25 Management ==============
+
+def get_ec25_enabled():
+    """Lee el estado de EC25_ENABLED desde .env"""
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                if line.startswith("EC25_ENABLED="):
+                    return line.strip().split("=", 1)[1] == "1"
+    return True  # Por defecto habilitado
+
+def set_ec25_enabled(enabled: bool):
+    """Escribe EC25_ENABLED en .env"""
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    lines = []
+    found = False
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                if line.startswith("EC25_ENABLED="):
+                    lines.append(f"EC25_ENABLED={'1' if enabled else '0'}\n")
+                    found = True
+                else:
+                    lines.append(line)
+    if not found:
+        lines.append(f"EC25_ENABLED={'1' if enabled else '0'}\n")
+    with open(env_path, "w") as f:
+        f.writelines(lines)
+
+def is_ec25_detected():
+    """Detecta si el EC25 está conectado"""
+    try:
+        port = find_at_port(force_refresh=True)
+        return port is not None
+    except:
+        return False
 
 # ============== Helper Functions ==============
 
@@ -190,6 +228,30 @@ def api_speedtest():
     logging.info("Speedtest iniciado por %s", current_user.username)
     result = run_speedtest()
     return jsonify(result)
+
+
+# ============== EC25 Status & Control ==============
+
+@web.route("/api/ec25/status")
+@login_required
+def api_ec25_status():
+    """Obtiene estado del EC25: detectado y habilitado"""
+    detected = is_ec25_detected()
+    enabled = get_ec25_enabled()
+    return jsonify({
+        "detected": detected,
+        "enabled": enabled,
+        "available": detected and enabled
+    })
+
+@web.route("/api/ec25/toggle", methods=["POST"])
+@login_required
+def api_ec25_toggle():
+    """Activa o desactiva el EC25"""
+    enabled = request.json.get("enabled", True)
+    set_ec25_enabled(enabled)
+    logging.info("EC25 %s by %s", "enabled" if enabled else "disabled", current_user.username)
+    return jsonify({"ok": True, "enabled": enabled})
 
 
 # ============== WiFi AP Configuration ==============
