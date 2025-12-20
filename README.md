@@ -1,18 +1,29 @@
-# EC25 Router Panel
+# 🚀 EC25 Router - Router 4G LTE Profesional
 
-Router LTE profesional basado en Quectel EC25 + Raspberry Pi.
+Router LTE profesional basado en Quectel EC25 + Raspberry Pi con WiFi Access Point.
 
-## 🚀 Features
+## ✨ Features
 
-- ✅ **WAN Auto-Failover** - Ethernet / LTE automático
-- ✅ **Panel Web** - Dashboard local con Flask + Gunicorn
-- ✅ **Autenticación** - Login seguro con Flask-Login
-- ✅ **Monitor LTE** - Señal, operador, tecnología, banda
-- ✅ **Config Web** - APN, WAN mode, firewall
-- ✅ **Firewall/NAT** - iptables configurable, aislamiento WiFi
-- ✅ **Watchdog** - Auto-recovery WAN/LTE
-- ✅ **Logging** - Rotativo, no llena disco
-- ✅ **Producción** - systemd, arranque automático
+### Core
+- ✅ **WAN Auto-Failover** - Ethernet / LTE automático con prioridad configurable
+- ✅ **Panel Web** - Dashboard moderno con métricas en tiempo real
+- ✅ **Autenticación** - Login seguro con Flask-Login y hash de passwords
+- ✅ **Monitor LTE** - Señal (CSQ/RSRP/RSRQ/RSSI), operador, tecnología, banda, frecuencia
+- ✅ **Speedtest** - Prueba de velocidad integrada en el dashboard
+- ✅ **Firewall/NAT** - iptables con MASQUERADE automático
+- ✅ **Watchdog** - Auto-recovery de conexión WAN/LTE
+- ✅ **Logging** - Sistema rotativo, no llena el disco
+
+### WiFi Access Point
+- ✅ **WiFi AP** - Punto de acceso WiFi configurable (hostapd + dnsmasq)
+- ✅ **DHCP Server** - Asignación automática de IPs (192.168.50.10-100)
+- ✅ **NAT/Routing** - Comparte internet de eth0/usb0 con clientes WiFi
+- ✅ **Auto-start** - Servicios persistentes con systemd
+
+### Producción
+- ✅ **Systemd Services** - Arranque automático y gestión de servicios
+- ✅ **Instalación Portátil** - Detecta usuario automáticamente, no hardcodea paths
+- ✅ **Verificación** - Script de diagnóstico completo post-instalación
 
 ## 📋 Requisitos
 
@@ -21,19 +32,32 @@ Router LTE profesional basado en Quectel EC25 + Raspberry Pi.
 - Debian/Raspbian Bookworm
 - Python 3.9+
 
-## ⚡ Instalación rápida
+## ⚡ Instalación Rápida
 
-### Opción 1: Script automático (recomendado)
+### Opción 1: Script Automático (Recomendado)
 
 ```bash
-# Clonar/copiar proyecto
-cd /home/tu_usuario
-git clone <repo> ec25-router
-cd ec25-router
+# Clonar proyecto
+git clone https://github.com/Tinex3/RPI_Router_4G.git
+cd RPI_Router_4G
+
+# Hacer ejecutable el instalador
+chmod +x install.sh
 
 # Ejecutar instalador (detecta usuario automáticamente)
 ./install.sh
+
+# Durante la instalación te preguntará si quieres configurar el WiFi AP
+# Responde 'y' para configurar hostapd + dnsmasq automáticamente
 ```
+
+**El instalador configura:**
+1. Dependencias del sistema (python3-venv, iptables, jq)
+2. Entorno virtual Python con todos los paquetes
+3. Servicios systemd (ec25-router, wan-manager, watchdog)
+4. **Opcional:** WiFi Access Point (hostapd, dnsmasq, wlan0-ap)
+5. Reglas iptables persistentes (NAT/MASQUERADE)
+6. Logs rotativos en `/var/log/ec25-router/`
 
 ### Opción 2: Instalación manual
 
@@ -70,11 +94,28 @@ sudo systemctl enable --now ec25-router wan-manager watchdog
 
 ## 🌐 Acceso
 
+### Panel Web
 ```
 http://RASPBERRY_IP:5000/
 
-Login: admin
-Password: admin1234 (¡cámbiala!)
+Usuario: admin
+Password: admin1234 (¡CAMBIAR INMEDIATAMENTE!)
+```
+
+### WiFi Access Point (si configuraste)
+```
+SSID: RPI_Router_4G
+Password: router4g2024
+
+IP Gateway: 192.168.50.1
+DHCP Range: 192.168.50.10 - 192.168.50.100
+```
+
+⚠️ **Cambiar contraseña WiFi:**
+```bash
+sudo nano /etc/hostapd/hostapd.conf
+# Modificar línea: wpa_passphrase=TU_NUEVA_PASSWORD
+sudo systemctl restart hostapd
 ```
 
 ## 📚 Documentación
@@ -90,20 +131,129 @@ source venv/bin/activate
 python -c "from werkzeug.security import generate_password_hash; \
 print(generate_password_hash('TU_PASSWORD'))"
 ```
+### Servicios Principales
+1. **ec25-router.service** - Panel web (Flask/Gunicorn, puerto 5000)
+2. **wan-manager.service** - Failover automático eth0 ↔ usb0
+3. **watchdog.service** - Auto-recovery de conexiones WAN/LTE
 
-Copiar hash en `data/config.json` → `auth.password_hash`
+### Servicios WiFi AP (opcionales)
+4. **wlan0-ap.service** - Configuración de interfaz wlan0 (IP 192.168.50.1)
+5. **hostapd.service** - Daemon de Access Point WiFi
+6. **dnsmasq.service** - Servidor DHCP/DNS para clientes WiFi
 
+### Ver Logs
 ```bash
-sudo systemctl restart ec25-router
+# Servicios principales
+sudo journalctl -u ec25-router -f
+sudo journalctl -u wan-manager -f
+sudo journalctl -u watchdog -f
+
+# Servicios WiFi
+sudo journalctl -u hostapd -f
+sudo journalctl -u dnsmasq -f
 ```
 
-## 🔥 Firewall
+### Reiniciar Servicios
+```bash
+# Router completo
+sudo systemctl restart ec25-router wan-manager watchdog
 
-Desde Settings en la web:
-- Marcar "Aislar clientes Wi-Fi"
-- Click "Aplicar"
+# WiFi AP completo
+sudo syComandos Útiles
 
-Esto configura automáticamente NAT y forwarding.
+### Verificación del Sistema
+```bash
+# Ejecutar script de diagnóstico completo
+sudo bash /opt/ec25-router/scripts/verify-install.sh
+
+# Verifica: servicios, red, iptables, WiFi AP, modem, Python env
+``` del Proyecto
+
+```
+RPI_Router_4G/
+├── app/                      # Código Python
+│   ├── __init__.py          # Inicialización Flask
+│   ├── auth.py              # Autenticación Flask-Login
+│   ├── firewall.py          # Gestión iptables
+│   ├── modem.py             # Comandos AT al EC25 (parsers CSQ/QCSQ/etc)
+│   ├── network.py           # Detección WAN (eth0/usb0)
+│   ├── speedtest.py         # Prueba de velocidad (speedtest-cli)
+│   └── web.py               # Rutas Flask (UI + API)
+├── templates/               # HTML Jinja2
+│   ├── dashboard.html       # Dashboard principal (4 cards: WAN/Signal/Modem/Speed)
+│   ├── login.html           # Página de login
+│   └── settings.html        # Configuración
+├── static/                  # Frontend assets
+│   ├── css/style.css        # Estilos dark mode profesional
+│   └── js/dashboard.js      # Actualización datos en tiempo real
+├── scripts/                 # Scripts de instalación/gestión
+│   ├── setup-ap.sh          # Configuración WiFi AP (hostapd/dnsmasq)
+│   ├── verify-install.sh    # Diagnóstico completo del sistema
+│   └── ...                  # Otros scripts auxiliares
+├── systemd/                 # Servicios systemd
+│   ├── ec25-router.service  # Servicio web principal (Gunicorn)
+│   ├── wan-manager.service  # Failover automático
+│   ├── watchdog.service     # Auto-recovery
+│   └── wlan0-ap.service     # Configuración wlan0 (antes de hostapd)
+├── config/                  # Archivos de configuración
+│   ├── hostapd.conf         # Config WiFi AP (SSID, password, canal)
+│   └── dnsmasq.conf         # Config DHCP/DNS para WiFi
+├── data/
+│   └── config.json          # Configuración del router (APN, WAN mode, etc)
+├── install.sh               # Instalador automático principal
+├── requirements.txt         # Dependencias Python
+├── run.py                   # Entrypoint Flask
+└── README.md               # Este archivo
+```basFeatures Implementados
+
+- [x] **Panel básico** - Dashboard con métricas LTE
+- [x] **WAN failover** - Cambio automático eth0 ↔ usb0
+- [x] **Control web** - Configuración desde UI
+- [x] **Producción** - Auth, firewall, watchdog, systemd
+- [x] **Parseo AT** - Respuestas legibles (señal, operador, red)
+- [x] **UI/UX mejorado** - 4 cards, badges de estado, medidores visuales
+- [x] **Speedtest** - Prueba de velocidad integrada
+- [x] **WiFi Access Point** - hostapd + dnsmasq automático
+- [x] **NAT persistente** - iptables con MASQUERADE para eth0/usb0/wlan0
+- [x] **Instalación portátil** - No hardcodea usuarios ni paths
+- [x] **Diagnóstico** - Script verify-install.sh completo
+
+## 🚧 Roadmap Futuro
+
+- [ ] Estadísticas históricas (gráficos de señal/consumo)
+- [ ] Alertas (email/telegram cuando cae conexión)
+- [ ] API REST completa (control remoto)
+- [ ] Config WiFi desde UI (cambiar SSID/password sin SSH)
+- [ ] SMS Gateway (enviar/recibir SMS desde EC25)
+- [ ] VPN Server (OpenVPN/WireGuard)
+- [ ] QoS (priorización de tráfico)
+# Verificar DHCP leases
+cat /var/lib/misc/dnsmasq.leases
+```
+
+### Network
+```bash
+# Ver interfaces y IPs
+ip addr show
+
+# Ver rutas
+ip route show
+
+# Ver reglas iptables NAT
+sudo iptables -t nat -L POSTROUTING -n -v
+
+# Ver reglas FORWARD
+sudo iptables -L FORWARD -n -v
+```
+
+### Desarrollo
+```bash
+# Modo desarrollo (sin Gunicorn)
+cd /opt/ec25-router
+source venv/bin/activate
+python run.py
+
+# Acceder en: http://localhost:5000a automáticamente NAT y forwarding.
 
 ## 📊 Servicios
 
