@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid">
+  <div class="card">
+    <h2>WAN</h2>
+    <div id="wanStatus" class="big">–</div>
+    <div class="row">
+      <select id="wanMode" class="input">
+        <option value="auto">Auto</option>
+        <option value="eth">Ethernet</option>
+        <option value="lte">LTE</option>
+      </select>
+      <button class="btn" onclick="saveWan()">Guardar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Señal</h2>
+    <pre id="signal" class="pre">Cargando…</pre>
+  </div>
+
+  <div class="card">
+    <h2>Módem</h2>
+    <button class="btn danger" onclick="resetModem()">Reset Modem</button>
+    <pre id="modem" class="pre">Cargando…</pre>
+  </div>
+</div>
+
+<script src="/static/js/dashboard.js"></script>
+{% endblock %}

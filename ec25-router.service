@@ -1,0 +1,18 @@
+[Unit]
+Description=EC25 Router Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/ec25-router
+ExecStart=/opt/ec25-router/venv/bin/python3 /opt/ec25-router/run.py
+Restart=always
+RestartSec=10
+
+# Limites de recursos
+MemoryLimit=512M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

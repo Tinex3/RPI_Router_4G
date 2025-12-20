@@ -1,0 +1,15 @@
+{
+  "apn": "wap.tmovil.cl",
+  "ip_type": "IPV4V6",
+  "wan_mode": "auto",
+
+  "security": {
+    "isolate_clients": true,
+    "allow_admin_from_ap": true
+  },
+
+  "auth": {
+    "username": "admin",
+    "password_hash": ""
+  }
+}

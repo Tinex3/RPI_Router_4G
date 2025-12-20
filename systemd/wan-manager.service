@@ -1,0 +1,21 @@
+[Unit]
+Description=WAN Auto Failover Manager
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/ec25-router/scripts/wan-manager.sh
+Restart=always
+RestartSec=3
+
+# Ejecutar como root para cambiar rutas
+User=root
+
+# Limites
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wan-manager
+
+[Install]
+WantedBy=multi-user.target

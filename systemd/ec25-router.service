@@ -1,0 +1,22 @@
+[Unit]
+Description=EC25 Router Panel (Flask/Gunicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# NOTA: El script install.sh reemplaza esto automáticamente con el usuario actual
+User=%USER%
+WorkingDirectory=/opt/ec25-router
+Environment="PATH=/opt/ec25-router/venv/bin"
+ExecStart=/opt/ec25-router/venv/bin/gunicorn -w 2 -b 0.0.0.0:5000 run:app
+Restart=always
+RestartSec=3
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ec25-router
+
+[Install]
+WantedBy=multi-user.target

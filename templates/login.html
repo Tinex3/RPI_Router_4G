@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - EC25 Router</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <main class="container narrow">
+    <div class="card">
+      <h1>Login</h1>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash">
+            {% for cat, msg in messages %}
+              <div class="flash-item {{cat}}">{{ msg }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      <form method="POST">
+        <label>Usuario</label>
+        <input name="username" class="input" placeholder="admin" required autofocus>
+        <label>Password</label>
+        <input name="password" class="input" type="password" required>
+        <button class="btn" style="margin-top: 14px; width: 100%;">Entrar</button>
+      </form>
+      <p class="muted">Default: admin / admin1234 (cámbiala después)</p>
+    </div>
+  </main>
+</body>
+</html>
