@@ -2,14 +2,17 @@ import logging
 import subprocess
 import re
 import os
-from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash
+import json
+import time
+from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash, Response
 from flask_login import login_user, logout_user, login_required, current_user
 
-from .modem import get_network_info, get_signal, set_apn, reset_modem, find_at_port
+from .modem import get_network_info, get_signal, set_apn, reset_modem, find_at_port, is_ec25_detected as modem_is_ec25_detected
 from .config import load_config, save_config
 from .network import active_wan
 from .firewall import apply_firewall
 from .speedtest import run_speedtest
+from . import ec25_monitor
 
 web = Blueprint("web", __name__)
 
@@ -50,6 +53,17 @@ def is_ec25_detected():
         return port is not None
     except:
         return False
+
+
+@web.route("/api/ec25/data")
+@login_required
+def api_ec25_data():
+    """
+    Obtiene los últimos datos del EC25 desde el cache del monitor.
+    Alternativa rápida al SSE para obtener datos sin streaming.
+    """
+    data = ec25_monitor.get_latest_data()
+    return jsonify(data)
 
 # ============== Helper Functions ==============
 
@@ -250,8 +264,50 @@ def api_ec25_toggle():
     """Activa o desactiva el EC25"""
     enabled = request.json.get("enabled", True)
     set_ec25_enabled(enabled)
+    
+    # Controlar el monitor asíncrono
+    ec25_monitor.set_monitor_enabled(enabled)
+    
     logging.info("EC25 %s by %s", "enabled" if enabled else "disabled", current_user.username)
     return jsonify({"ok": True, "enabled": enabled})
+
+
+@web.route("/api/ec25/stream")
+@login_required
+def api_ec25_stream():
+    """
+    Server-Sent Events endpoint para streaming de datos del EC25 en tiempo real.
+    Consume datos de la cola alimentada por el hilo de monitoreo.
+    """
+    def event_stream():
+        """Generador que produce eventos SSE"""
+        # Enviar datos iniciales desde cache
+        initial_data = ec25_monitor.get_latest_data()
+        yield f"data: {json.dumps(initial_data)}\n\n"
+        
+        # Timeout para keep-alive (30s)
+        timeout = 30.0
+        
+        while True:
+            try:
+                # Esperar datos de la cola con timeout
+                data = ec25_monitor.ec25_data_queue.get(timeout=timeout)
+                
+                # Enviar como evento SSE
+                yield f"data: {json.dumps(data)}\n\n"
+                
+            except:
+                # Timeout: enviar keep-alive (comentario SSE)
+                yield ": keep-alive\n\n"
+    
+    return Response(
+        event_stream(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"  # Nginx buffering disabled
+        }
+    )
 
 
 # ============== WiFi AP Configuration ==============
@@ -532,9 +588,19 @@ def api_system_shutdown():
     """Apaga el sistema"""
     logging.warning("System shutdown requested by %s", current_user.username)
     try:
-        subprocess.Popen(["sudo", "shutdown", "-h", "+1"],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return jsonify({"ok": True, "message": "Sistema apagandose en 1 minuto..."})
+        # Soportar delay opcional en body (por ejemplo: {"delay":"+1"})
+        data = request.get_json(silent=True) or {}
+        delay = data.get("delay")
+        if delay:
+            cmd = ["sudo", "shutdown", "-h", str(delay)]
+            message = f"Sistema apagandose en {delay}..."
+        else:
+            # Apagado inmediato
+            cmd = ["sudo", "shutdown", "-h", "now"]
+            message = "Sistema apagandose ahora..."
+
+        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return jsonify({"ok": True, "message": message})
     except Exception as e:
         logging.error("Error shutting down system: %s", e)
         return jsonify({"ok": False, "error": str(e)}), 500

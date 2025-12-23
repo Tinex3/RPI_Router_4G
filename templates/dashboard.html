@@ -143,6 +143,9 @@
       </div>
     </div>
     <button class="btn danger" onclick="resetModem()" style="margin-top: 16px; width: 100%;">🔄 Reiniciar Módem</button>
+    <div id="ec25LastUpdate" style="text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 8px;">
+      Conectando...
+    </div>
   </div>
 
   <div class="card">
@@ -174,5 +177,6 @@
   </div>
 </div>
 
+<script src="/static/js/ec25_monitor.js"></script>
 <script src="/static/js/dashboard.js"></script>
 {% endblock %}

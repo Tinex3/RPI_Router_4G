@@ -3,6 +3,8 @@ from flask_login import LoginManager
 from .web import web
 from .auth import get_user
 from .logging_config import setup_logging
+from .ec25_monitor import start_monitor, set_monitor_enabled
+from .web import get_ec25_enabled
 import os
 
 def create_app() -> Flask:
@@ -33,4 +35,9 @@ def create_app() -> Flask:
         return get_user()
 
     app.register_blueprint(web)
+    
+    # Iniciar monitor EC25 en hilo separado
+    ec25_enabled = get_ec25_enabled()
+    start_monitor(update_interval=5.0, enabled=ec25_enabled)
+    
     return app

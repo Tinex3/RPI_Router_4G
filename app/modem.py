@@ -198,3 +198,8 @@ def set_apn(apn: str):
 def reset_modem():
     """Reinicia el módem EC25"""
     return send_at("AT+CFUN=1,1")
+
+def is_ec25_detected():
+    """Detecta si el módem EC25 está presente"""
+    port = find_at_port()
+    return port is not None
