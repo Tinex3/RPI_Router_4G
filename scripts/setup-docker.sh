@@ -100,3 +100,20 @@ echo "             sudo reboot"
 echo ""
 echo "Verificar con: docker run hello-world"
 echo ""
+
+# Ejecutar detección de Gateway EUI automáticamente
+echo ""
+echo "========================================================================"
+echo "         Detectando Gateway EUI                                         "
+echo "========================================================================"
+echo ""
+echo "[INFO] Ejecutando detección automática del Gateway EUI..."
+
+if docker run -it --privileged --rm -e GATEWAY_EUI_SOURCE=chip xoseperez/basicstation:latest gateway_eui; then
+    echo "[OK] Gateway EUI detectado correctamente"
+else
+    echo "[WARNING] No se pudo detectar el Gateway EUI automáticamente"
+    echo "          Puedes ejecutarlo manualmente más tarde desde la interfaz web"
+fi
+
+echo ""
