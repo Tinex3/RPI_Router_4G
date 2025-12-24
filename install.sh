@@ -20,6 +20,7 @@ fi
 CURRENT_USER=$(whoami)
 INSTALL_DIR="/opt/ec25-router"
 LOG_DIR="/var/log/ec25-router"
+DOCKER_GROUP_ADDED=false
 
 echo "📋 Configuración detectada:"
 echo "   Usuario: $CURRENT_USER"
@@ -187,19 +188,46 @@ else
 fi
 
 echo ""
+echo "1️⃣2️⃣  Verificando Docker..."
+echo ""
+if command -v docker &> /dev/null; then
+  echo "   ✅ Docker ya está instalado"
+  if groups "$CURRENT_USER" | grep -q docker; then
+    echo "   ✅ Usuario $CURRENT_USER en grupo docker"
+  else
+    echo "   ⚠️  Agregando $CURRENT_USER al grupo docker..."
+    sudo usermod -aG docker "$CURRENT_USER"
+    DOCKER_GROUP_ADDED=true
+  fi
+  # Verificar si config.txt tiene las configuraciones de LoRaWAN
+  if grep -q "^dtoverlay=disable-bt" /boot/firmware/config.txt 2>/dev/null; then
+    DOCKER_GROUP_ADDED=true  # Marcar que necesita reinicio
+  fi
+else
+  echo "   ℹ️  Docker no está instalado"
+  echo "   Para instalar Docker y configurar LoRaWAN:"
+  echo "      sudo bash $INSTALL_DIR/scripts/setup-docker.sh"
+fi
+
+echo ""
 echo "╔════════════════════════════════════════════════════════════════════╗"
 echo "║                  ✅ INSTALACIÓN COMPLETADA                        ║"
 echo "╚════════════════════════════════════════════════════════════════════╝"
 echo ""
 
+# Verificar si se necesita reinicio (Docker instalado = cambios en config.txt)
+NEEDS_REBOOT=false
+if [ "$DOCKER_GROUP_ADDED" = true ]; then
+  NEEDS_REBOOT=true
+fi
+
 # Aviso importante sobre Docker si se agregó al grupo
 if [ "$DOCKER_GROUP_ADDED" = true ]; then
-  echo "⚠️  IMPORTANTE - Docker:"
-  echo "   Se agregó tu usuario al grupo 'docker'."
-  echo "   Para usar Docker sin sudo, debes:"
-  echo "   - Cerrar sesión y volver a entrar, O"
-  echo "   - Ejecutar: newgrp docker"
-  echo "   - O reiniciar el sistema"
+  echo "⚠️  IMPORTANTE - Docker y LoRaWAN:"
+  echo "   ✅ Docker instalado correctamente"
+  echo "   ✅ SPI activado en /boot/firmware/config.txt"
+  echo "   ✅ Bluetooth desactivado (libera recursos)"
+  echo "   ✅ Usuario agregado al grupo 'docker'"
   echo ""
 fi
 
@@ -227,3 +255,20 @@ echo "   sudo systemctl restart ec25-router"
 echo ""
 echo "📚 Documentación: $INSTALL_DIR/ETAPA4.md"
 echo ""
+
+# Mensaje de reinicio si es necesario
+if [ "$NEEDS_REBOOT" = true ]; then
+  echo "╔════════════════════════════════════════════════════════════════════╗"
+  echo "║              🔄 REINICIO NECESARIO                                ║"
+  echo "╚════════════════════════════════════════════════════════════════════╝"
+  echo ""
+  echo "⚠️  Se realizaron cambios en /boot/firmware/config.txt"
+  echo "   (SPI activado + Bluetooth desactivado para LoRaWAN)"
+  echo ""
+  echo "🔄 DEBES REINICIAR el sistema para que los cambios surtan efecto:"
+  echo ""
+  echo "   sudo reboot"
+  echo ""
+  echo "╔════════════════════════════════════════════════════════════════════╗"
+  echo ""
+fi
