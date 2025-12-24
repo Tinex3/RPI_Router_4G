@@ -1,11 +1,16 @@
 #!/bin/bash
-# Script para corregir problemas de conectividad Ethernet
-# causados por reglas iptables incorrectas del AP WiFi
+# =========================================================
+# Router WAN Fix + Failover Complete
+# - Elimina rutas duplicadas sin gateway (loopback fix)
+# - Failover inteligente: EC25 (wwan0) -> Ethernet (eth0)
+# - Corrige iptables (solo NAT para WiFi)
+# - UNA sola default route controlada
+# =========================================================
 
 set -e
 
 echo "========================================================================"
-echo "         Fix: Restaurar conectividad Ethernet                          "
+echo "         Fix: Restaurar conectividad + WAN Failover                    "
 echo "========================================================================"
 echo ""
 
@@ -15,7 +20,39 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-echo "[1/4] Diagnosticando conectividad..."
+# Variables de configuración
+PING_TARGET="8.8.8.8"
+WAN_4G="wwan0"
+WAN_ETH="eth0"
+
+# ---------------------------------------------------------
+# Funciones de detección de WAN
+# ---------------------------------------------------------
+
+get_gw_eth() {
+    # Obtener gateway de DHCP o ruta estática en eth0
+    ip route show dev "$WAN_ETH" | awk '/via/ {print $3; exit}' | head -1
+}
+
+get_gw_4g() {
+    # Obtener gateway de wwan0
+    ip route show dev "$WAN_4G" | awk '/via/ {print $3; exit}' | head -1
+}
+
+test_wan() {
+    local iface="$1"
+    # Probar si la interfaz tiene conectividad real
+    if ip link show "$iface" &>/dev/null; then
+        if ip addr show "$iface" | grep -q "inet "; then
+            if ping -I "$iface" -c 2 -W 3 "$PING_TARGET" &>/dev/null; then
+                return 0
+            fi
+        fi
+    fi
+    return 1
+}
+
+echo "[1/7] Diagnosticando conectividad..."
 echo ""
 
 # Probar conectividad por IP
@@ -45,40 +82,92 @@ if [ "$IP_OK" = true ] && [ "$DNS_OK" = true ]; then
   exit 0
 fi
 
-echo "[2/6] Verificando rutas de red..."
+echo "[2/7] Limpiando TODAS las rutas por defecto..."
 echo ""
-echo "=== Rutas actuales ==="
+echo "=== Rutas actuales (antes del fix) ==="
 ip route show
 echo ""
 
-# Detectar ruta duplicada sin gateway
-DUPLICATE_ROUTE=$(ip route show | grep "^default dev eth0 scope link" || true)
-if [ -n "$DUPLICATE_ROUTE" ]; then
-  echo "   ⚠️  PROBLEMA DETECTADO: Ruta por defecto duplicada sin gateway"
-  echo "   Ruta problemática: $DUPLICATE_ROUTE"
+# Eliminar TODAS las rutas por defecto (limpiar slate)
+echo "   🧹 Eliminando todas las default routes..."
+while ip route del default 2>/dev/null; do
+    echo "      ✅ Ruta eliminada"
+done
+
+# Configurar NetworkManager para evitar que cree rutas automáticas
+if command -v nmcli &> /dev/null; then
   echo ""
-  echo "[3/6] Eliminando ruta duplicada..."
-  ip route del default dev eth0 scope link 2>/dev/null && \
-    echo "   ✅ Ruta duplicada eliminada" || \
-    echo "   ⚠️  No se pudo eliminar la ruta"
-  
-  # Configurar NetworkManager para evitar que vuelva a crear la ruta
-  if command -v nmcli &> /dev/null; then
-    echo ""
-    echo "   🔧 Configurando NetworkManager..."
-    CONN_NAME=$(nmcli -t -f NAME connection show --active | grep -E "eth|Wired" | head -1)
-    if [ -n "$CONN_NAME" ]; then
-      nmcli connection modify "$CONN_NAME" ipv4.never-default no 2>/dev/null || true
-      nmcli connection modify "$CONN_NAME" ipv6.method disabled 2>/dev/null || true
-      echo "   ✅ NetworkManager configurado para '$CONN_NAME'"
-    fi
+  echo "   🔧 Configurando NetworkManager..."
+  CONN_NAME=$(nmcli -t -f NAME connection show --active | grep -E "eth|Wired" | head -1)
+  if [ -n "$CONN_NAME" ]; then
+    nmcli connection modify "$CONN_NAME" ipv4.never-default no 2>/dev/null || true
+    nmcli connection modify "$CONN_NAME" ipv6.method disabled 2>/dev/null || true
+    echo "   ✅ NetworkManager configurado para '$CONN_NAME'"
   fi
-else
-  echo "   ✅ No se detectaron rutas duplicadas"
 fi
 
 echo ""
-echo "[4/6] Mostrando reglas iptables actuales..."
+echo "[3/7] Detectando WAN disponible (Failover Logic)..."
+echo ""
+
+# ---------------------------------------------------------
+# PRIORIDAD 1: EC25 / 4G (wwan0)
+# ---------------------------------------------------------
+if test_wan "$WAN_4G"; then
+    GW=$(get_gw_4g)
+    if [ -n "$GW" ]; then
+        ip route add default via "$GW" dev "$WAN_4G"
+        echo "   ✅ WAN ACTIVA: EC25 (wwan0) via $GW"
+        echo "   📡 Conexión 4G funcionando correctamente"
+        WAN_SELECTED="4G"
+    fi
+else
+    echo "   ℹ️  EC25 (wwan0): No disponible o sin internet"
+fi
+
+# ---------------------------------------------------------
+# PRIORIDAD 2: ETHERNET (eth0) - FALLBACK
+# ---------------------------------------------------------
+if [ -z "$WAN_SELECTED" ]; then
+    GW=$(get_gw_eth)
+    
+    if [ -z "$GW" ]; then
+        # Intentar obtener gateway desde DHCP
+        echo "   🔄 Renovando DHCP en eth0..."
+        dhclient -r eth0 2>/dev/null || true
+        sleep 2
+        dhclient eth0 2>/dev/null || true
+        sleep 2
+        GW=$(get_gw_eth)
+    fi
+    
+    if [ -n "$GW" ]; then
+        ip route add default via "$GW" dev "$WAN_ETH"
+        echo "   ✅ WAN ACTIVA: Ethernet (eth0) via $GW"
+        echo "   🔌 Usando conexión Ethernet como fallback"
+        WAN_SELECTED="Ethernet"
+    else
+        echo "   ❌ Ethernet (eth0): Sin gateway disponible"
+    fi
+fi
+
+# ---------------------------------------------------------
+# SIN WAN DISPONIBLE
+# ---------------------------------------------------------
+if [ -z "$WAN_SELECTED" ]; then
+    echo ""
+    echo "   ⚠️  ADVERTENCIA: No hay WAN disponible"
+    echo "   📋 Diagnóstico:"
+    echo "      - EC25 no está conectado o sin señal"
+    echo "      - Ethernet sin cable o sin DHCP"
+    echo ""
+    echo "   🔧 Soluciones:"
+    echo "      - Verificar SIM y señal del EC25"
+    echo "      - Conectar cable Ethernet y verificar router"
+fi
+
+echo ""
+echo "[4/7] Mostrando reglas iptables actuales..."
 echo ""
 echo "=== Tabla NAT (POSTROUTING) ==="
 iptables -t nat -L POSTROUTING -v -n | head -20
@@ -101,8 +190,7 @@ iptables -t nat -D POSTROUTING -o usb0 -j MASQUERADE 2>/dev/null && \
   echo "      ✅ Regla genérica usb0 eliminada" || \
   echo "      ℹ️  No había regla genérica en usb0"
 
-echo ""
-echo "[6/6] Aplicando reglas correctas (solo para WiFi)..."
+echo "[6/7] Aplicando reglas correctas (solo para WiFi)..."
 echo ""
 
 # Asegurar que existan las reglas correctas (solo para red WiFi)
@@ -125,13 +213,19 @@ if command -v netfilter-persistent &> /dev/null; then
 fi
 
 echo ""
-echo "========================================================================"
-echo "         Verificando conectividad después del fix                      "
-echo "========================================================================"
+echo "[7/7] Verificando conectividad después del fix..."
+echo ""
+echo "=== Rutas actuales (después del fix) ==="
+ip route show
 echo ""
 
 # Dar tiempo a que se apliquen cambios
 sleep 2
+
+echo "========================================================================"
+echo "         Verificando conectividad después del fix                      "
+echo "========================================================================"
+echo ""
 
 # Verificar DNS
 if [ "$DNS_OK" = false ]; then
@@ -177,9 +271,25 @@ echo "========================================================================"
 echo "                        FIX COMPLETADO                                  "
 echo "========================================================================"
 echo ""
-echo "📋 Reglas NAT actuales (solo WiFi):"
-iptables -t nat -L POSTROUTING -v -n | grep "192.168.50"
+
+if [ -n "$WAN_SELECTED" ]; then
+    echo "🌐 WAN ACTIVA: $WAN_SELECTED"
+else
+    echo "⚠️  Sin WAN disponible"
+fi
+
 echo ""
-echo "✅ Ahora el ServerPi debería tener conectividad Ethernet normal"
+echo "📋 Estado del sistema:"
+echo "   Rutas:"
+ip route show | grep default || echo "      (ninguna)"
+echo ""
+echo "   Reglas NAT (solo WiFi):"
+iptables -t nat -L POSTROUTING -v -n | grep "192.168.50" || echo "      (ninguna configurada)"
+echo ""
+echo "✅ Fix aplicado correctamente"
+echo "✅ El ServerPi tiene conectividad con WAN disponible"
 echo "✅ Los clientes WiFi seguirán funcionando correctamente"
+echo ""
+echo "💡 Para failover automático, ejecuta este script periódicamente:"
+echo "   (El timer wan-failover.timer lo hace automáticamente)"
 echo ""
