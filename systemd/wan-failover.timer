@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodic WAN failover check (every 30s)
+Documentation=man:systemd.timer(5)
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=30
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

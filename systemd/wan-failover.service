@@ -1,0 +1,10 @@
+[Unit]
+Description=WAN Failover (EC25 4G -> Ethernet)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/ec25-router/scripts/wan-failover.sh
+StandardOutput=journal
+StandardError=journal
