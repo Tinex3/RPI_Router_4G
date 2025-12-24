@@ -73,14 +73,14 @@ echo ""
 echo "6️⃣  Configurando servicios systemd..."
 
 # Crear archivo temporal con el usuario correcto
-for service in wan-manager watchdog ec25-router; do
+for service in wan-manager watchdog ec25-router wan-failover; do
   SERVICE_FILE="$INSTALL_DIR/systemd/${service}.service"
   TEMP_FILE="/tmp/${service}.service.tmp"
   
   # Reemplazar placeholder de usuario si existe
   if [ -f "$SERVICE_FILE" ]; then
-    # Para wan-manager y watchdog: ejecutar como root
-    if [ "$service" = "wan-manager" ] || [ "$service" = "watchdog" ]; then
+    # Para wan-manager, watchdog y wan-failover: ejecutar como root
+    if [ "$service" = "wan-manager" ] || [ "$service" = "watchdog" ] || [ "$service" = "wan-failover" ]; then
       sed "s/User=.*/User=root/" "$SERVICE_FILE" > "$TEMP_FILE"
     else
       # Para ec25-router: reemplazar TODOS los placeholders posibles
@@ -97,6 +97,12 @@ for service in wan-manager watchdog ec25-router; do
   fi
 done
 
+# Instalar wan-failover.timer
+if [ -f "$INSTALL_DIR/systemd/wan-failover.timer" ]; then
+  sudo cp "$INSTALL_DIR/systemd/wan-failover.timer" /etc/systemd/system/
+  echo "   ✅ wan-failover.timer configurado"
+fi
+
 echo ""
 echo "7️⃣  Recargando systemd..."
 sudo systemctl daemon-reload
@@ -106,6 +112,7 @@ echo "8️⃣  Habilitando e iniciando servicios..."
 sudo systemctl enable wan-manager
 sudo systemctl enable watchdog
 sudo systemctl enable ec25-router
+sudo systemctl enable wan-failover.timer
 
 echo ""
 echo "9️⃣  Iniciando servicios..."
@@ -114,6 +121,8 @@ sleep 2
 sudo systemctl start watchdog
 sleep 2
 sudo systemctl start ec25-router
+sleep 2
+sudo systemctl start wan-failover.timer
 
 echo ""
 echo "🔍 Verificando estado de servicios..."
@@ -126,6 +135,13 @@ for service in wan-manager watchdog ec25-router; do
     echo "      Ver logs: sudo journalctl -u $service -n 20"
   fi
 done
+
+# Verificar wan-failover.timer
+if sudo systemctl is-active --quiet wan-failover.timer; then
+  echo "   ✅ wan-failover.timer: RUNNING"
+else
+  echo "   ❌ wan-failover.timer: FAILED"
+fi
 
 echo ""
 echo "🔟 Verificando y corrigiendo rutas de red..."
@@ -185,7 +201,13 @@ if [ "$DOCKER_GROUP_ADDED" = true ]; then
   echo "   - Ejecutar: newgrp docker"
   echo "   - O reiniciar el sistema"
   echo ""
-fi
+fisudo journalctl -u wan-failover.service -f  # Failover automático"
+echo "   tail -f $LOG_DIR/app.log"
+echo ""
+echo "🔄 WAN Failover automático:"
+echo "   El sistema revisa cada 30s: EC25 (wwan0) → Ethernet (eth0)"
+echo "   Ver estado: systemctl status wan-failover.timer"
+echo "   Ver logs: journalctl -u wan-failover.service -f
 
 echo "🌐 Acceso web:"
 echo "   URL: http://$(hostname -I | awk '{print $1}'):5000/"
