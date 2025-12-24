@@ -201,7 +201,16 @@ if [ "$DOCKER_GROUP_ADDED" = true ]; then
   echo "   - Ejecutar: newgrp docker"
   echo "   - O reiniciar el sistema"
   echo ""
-fisudo journalctl -u wan-failover.service -f  # Failover automático"
+fi
+
+echo "🌐 Acceso web:"
+echo "   URL: http://$(hostname -I | awk '{print $1}'):5000/"
+echo "   Usuario: admin"
+echo "   Password: admin1234 (¡CAMBIAR!)"
+echo ""
+echo "📝 Ver logs:"
+echo "   sudo journalctl -u ec25-router -f"
+echo "   sudo journalctl -u wan-failover.service -f  # Failover automático"
 echo "   tail -f $LOG_DIR/app.log"
 echo ""
 echo "🔄 WAN Failover automático:"
