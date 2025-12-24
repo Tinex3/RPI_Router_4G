@@ -45,13 +45,46 @@ if [ "$IP_OK" = true ] && [ "$DNS_OK" = true ]; then
   exit 0
 fi
 
-echo "[2/4] Mostrando reglas iptables actuales..."
+echo "[2/6] Verificando rutas de red..."
+echo ""
+echo "=== Rutas actuales ==="
+ip route show
+echo ""
+
+# Detectar ruta duplicada sin gateway
+DUPLICATE_ROUTE=$(ip route show | grep "^default dev eth0 scope link" || true)
+if [ -n "$DUPLICATE_ROUTE" ]; then
+  echo "   ⚠️  PROBLEMA DETECTADO: Ruta por defecto duplicada sin gateway"
+  echo "   Ruta problemática: $DUPLICATE_ROUTE"
+  echo ""
+  echo "[3/6] Eliminando ruta duplicada..."
+  ip route del default dev eth0 scope link 2>/dev/null && \
+    echo "   ✅ Ruta duplicada eliminada" || \
+    echo "   ⚠️  No se pudo eliminar la ruta"
+  
+  # Configurar NetworkManager para evitar que vuelva a crear la ruta
+  if command -v nmcli &> /dev/null; then
+    echo ""
+    echo "   🔧 Configurando NetworkManager..."
+    CONN_NAME=$(nmcli -t -f NAME connection show --active | grep -E "eth|Wired" | head -1)
+    if [ -n "$CONN_NAME" ]; then
+      nmcli connection modify "$CONN_NAME" ipv4.never-default no 2>/dev/null || true
+      nmcli connection modify "$CONN_NAME" ipv6.method disabled 2>/dev/null || true
+      echo "   ✅ NetworkManager configurado para '$CONN_NAME'"
+    fi
+  fi
+else
+  echo "   ✅ No se detectaron rutas duplicadas"
+fi
+
+echo ""
+echo "[4/6] Mostrando reglas iptables actuales..."
 echo ""
 echo "=== Tabla NAT (POSTROUTING) ==="
 iptables -t nat -L POSTROUTING -v -n | head -20
 echo ""
 
-echo "[3/4] Limpiando reglas iptables problemáticas..."
+echo "[5/6] Limpiando reglas iptables problemáticas..."
 echo ""
 
 # Hacer backup de reglas actuales
@@ -69,7 +102,7 @@ iptables -t nat -D POSTROUTING -o usb0 -j MASQUERADE 2>/dev/null && \
   echo "      ℹ️  No había regla genérica en usb0"
 
 echo ""
-echo "[4/4] Aplicando reglas correctas (solo para WiFi)..."
+echo "[6/6] Aplicando reglas correctas (solo para WiFi)..."
 echo ""
 
 # Asegurar que existan las reglas correctas (solo para red WiFi)
