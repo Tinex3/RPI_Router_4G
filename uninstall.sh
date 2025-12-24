@@ -37,6 +37,8 @@ echo "[1/10] Deteniendo servicios del proyecto..."
 systemctl stop ec25-router 2>/dev/null || true
 systemctl stop wan-manager 2>/dev/null || true
 systemctl stop watchdog 2>/dev/null || true
+systemctl stop wan-failover.timer 2>/dev/null || true
+systemctl stop wan-failover.service 2>/dev/null || true
 systemctl stop hostapd 2>/dev/null || true
 systemctl stop dnsmasq 2>/dev/null || true
 systemctl stop wlan0-ap 2>/dev/null || true
@@ -47,6 +49,8 @@ echo "[2/10] Deshabilitando servicios..."
 systemctl disable ec25-router 2>/dev/null || true
 systemctl disable wan-manager 2>/dev/null || true
 systemctl disable watchdog 2>/dev/null || true
+systemctl disable wan-failover.timer 2>/dev/null || true
+systemctl disable wan-failover.service 2>/dev/null || true
 systemctl disable hostapd 2>/dev/null || true
 systemctl disable dnsmasq 2>/dev/null || true
 systemctl disable wlan0-ap 2>/dev/null || true
@@ -57,6 +61,8 @@ echo "[3/10] Eliminando archivos de servicios systemd..."
 rm -f /etc/systemd/system/ec25-router.service
 rm -f /etc/systemd/system/wan-manager.service
 rm -f /etc/systemd/system/watchdog.service
+rm -f /etc/systemd/system/wan-failover.service
+rm -f /etc/systemd/system/wan-failover.timer
 rm -f /etc/systemd/system/wlan0-ap.service
 rm -f /etc/systemd/system/hostapd.service
 rm -f /etc/systemd/system/dnsmasq.service
