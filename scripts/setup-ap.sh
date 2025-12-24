@@ -188,15 +188,17 @@ echo "[8/10] Configurando NAT/Firewall (LOS 3 PILARES)..."
 iptables -P FORWARD ACCEPT
 echo "   [OK] Politica FORWARD: ACCEPT"
 
-# PILAR 2: Reglas FORWARD explicitas
+# PILAR 2: Reglas FORWARD explicitas (solo para tráfico entre interfaces)
 echo "   [INFO] Configurando reglas FORWARD..."
 
+# Permitir tráfico de wlan0 (clientes WiFi) hacia WAN
 iptables -C FORWARD -i wlan0 -o eth0 -j ACCEPT 2>/dev/null || \
   iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
 
 iptables -C FORWARD -i wlan0 -o usb0 -j ACCEPT 2>/dev/null || \
   iptables -A FORWARD -i wlan0 -o usb0 -j ACCEPT
 
+# Permitir respuestas de vuelta (conexiones establecidas)
 iptables -C FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
   iptables -A FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT
 
@@ -205,22 +207,18 @@ iptables -C FORWARD -i usb0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACC
 
 echo "   [OK] Reglas FORWARD configuradas"
 
-# PILAR 3: NAT/MASQUERADE
+# PILAR 3: NAT/MASQUERADE (SOLO para tráfico de la red WiFi 192.168.50.0/24)
 echo "   [INFO] Configurando NAT/MASQUERADE..."
 
-iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || \
-  iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-
-iptables -t nat -C POSTROUTING -o usb0 -j MASQUERADE 2>/dev/null || \
-  iptables -t nat -A POSTROUTING -o usb0 -j MASQUERADE
-
+# IMPORTANTE: Solo hacer MASQUERADE del tráfico que viene de la red WiFi (192.168.50.0/24)
+# Esto NO afecta el tráfico local del ServerPi mismo
 iptables -t nat -C POSTROUTING -s 192.168.50.0/24 -o eth0 -j MASQUERADE 2>/dev/null || \
   iptables -t nat -A POSTROUTING -s 192.168.50.0/24 -o eth0 -j MASQUERADE
 
 iptables -t nat -C POSTROUTING -s 192.168.50.0/24 -o usb0 -j MASQUERADE 2>/dev/null || \
   iptables -t nat -A POSTROUTING -s 192.168.50.0/24 -o usb0 -j MASQUERADE
 
-echo "   [OK] NAT/MASQUERADE configurado"
+echo "   [OK] NAT/MASQUERADE configurado (solo para red WiFi 192.168.50.0/24)"
 
 # Guardar reglas
 iptables-save > /etc/iptables.rules

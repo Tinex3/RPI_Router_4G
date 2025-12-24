@@ -86,6 +86,22 @@
     <button class="btn" onclick="toggleEC25()">Guardar</button>
     <div id="ec25-status" class="status-msg"></div>
   </div>
+
+  <!-- Conexión Ethernet -->
+  <div class="card">
+    <h2>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+        <line x1="6" y1="6" x2="6.01" y2="6"></line>
+        <line x1="6" y1="18" x2="6.01" y2="18"></line>
+      </svg>
+      Conexión Ethernet
+    </h2>
+    <p class="hint">Si pierdes conexión a Internet por Ethernet, usa este botón para reparar rutas de red duplicadas.</p>
+    <button class="btn" onclick="fixEthernet()">🔧 Reparar Conexión</button>
+    <div id="ethernet-status" class="status-msg"></div>
+  </div>
 </div>
 
 <script src="/static/js/settings.js"></script>
@@ -116,6 +132,31 @@ async function changeWebPassword() {
     }
   } catch (e) {
     statusEl.textContent = 'Error de conexión';
+    statusEl.className = 'status-msg error';
+  }
+}
+
+async function fixEthernet() {
+  const statusEl = document.getElementById('ethernet-status');
+  statusEl.textContent = 'Reparando conexión...';
+  statusEl.className = 'status-msg';
+  
+  try {
+    const resp = await fetch('/api/system/fix-ethernet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await resp.json();
+    
+    if (data.success) {
+      statusEl.textContent = data.message || 'Conexión reparada correctamente';
+      statusEl.className = 'status-msg success';
+    } else {
+      statusEl.textContent = data.message || 'Error al reparar conexión';
+      statusEl.className = 'status-msg error';
+    }
+  } catch (e) {
+    statusEl.textContent = 'Error de conexión al servidor';
     statusEl.className = 'status-msg error';
   }
 }

@@ -606,6 +606,71 @@ def api_system_shutdown():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@web.route("/api/system/fix-ethernet", methods=["POST"])
+@login_required
+def api_system_fix_ethernet():
+    """Corrige problemas de conectividad Ethernet (rutas duplicadas)"""
+    logging.warning("Ethernet connectivity fix requested by %s", current_user.username)
+    try:
+        # Detectar ruta duplicada sin gateway
+        check_result = subprocess.run(
+            ["ip", "route", "show"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if "default dev eth0 scope link" in check_result.stdout:
+            # Eliminar ruta problemática
+            subprocess.run(
+                ["sudo", "ip", "route", "del", "default", "dev", "eth0", "scope", "link"],
+                capture_output=True,
+                timeout=5
+            )
+            
+            # Configurar NetworkManager
+            try:
+                # Obtener nombre de conexión activa
+                conn_result = subprocess.run(
+                    ["nmcli", "-t", "-f", "NAME", "connection", "show", "--active"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                
+                conn_names = [line.strip() for line in conn_result.stdout.split('\n') 
+                             if 'eth' in line.lower() or 'wired' in line.lower()]
+                
+                if conn_names:
+                    conn_name = conn_names[0]
+                    subprocess.run(
+                        ["sudo", "nmcli", "connection", "modify", conn_name, 
+                         "ipv4.never-default", "no"],
+                        timeout=5
+                    )
+                    subprocess.run(
+                        ["sudo", "nmcli", "connection", "modify", conn_name, 
+                         "ipv6.method", "disabled"],
+                        timeout=5
+                    )
+            except Exception as e:
+                logging.warning("NetworkManager config failed (non-critical): %s", e)
+            
+            return jsonify({
+                "ok": True, 
+                "message": "✅ Ruta duplicada eliminada. Conectividad restaurada."
+            })
+        else:
+            return jsonify({
+                "ok": True, 
+                "message": "ℹ️ No se detectaron problemas de rutas."
+            })
+            
+    except Exception as e:
+        logging.error("Error fixing ethernet: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @web.route("/api/system/info")
 @login_required
 def api_system_info():

@@ -128,7 +128,33 @@ for service in wan-manager watchdog ec25-router; do
 done
 
 echo ""
-echo "🔟 Configurando WiFi Access Point..."
+echo "🔟 Verificando y corrigiendo rutas de red..."
+echo ""
+
+# Detectar y eliminar ruta por defecto duplicada sin gateway
+DUPLICATE_ROUTE=$(ip route show | grep "^default dev eth0 scope link" || true)
+if [ -n "$DUPLICATE_ROUTE" ]; then
+  echo "   ⚠️  Detectada ruta por defecto duplicada sin gateway"
+  echo "   🔧 Eliminando: $DUPLICATE_ROUTE"
+  sudo ip route del default dev eth0 scope link 2>/dev/null || true
+  
+  # Configurar NetworkManager para evitar que vuelva a crear la ruta
+  if command -v nmcli &> /dev/null; then
+    CONN_NAME=$(nmcli -t -f NAME connection show --active | grep -E "eth|Wired" | head -1)
+    if [ -n "$CONN_NAME" ]; then
+      sudo nmcli connection modify "$CONN_NAME" ipv4.never-default no 2>/dev/null || true
+      sudo nmcli connection modify "$CONN_NAME" ipv6.method disabled 2>/dev/null || true
+      echo "   ✅ NetworkManager configurado correctamente"
+    fi
+  fi
+  
+  echo "   ✅ Conectividad Ethernet corregida"
+else
+  echo "   ✅ Rutas de red correctas"
+fi
+
+echo ""
+echo "1️⃣1️⃣  Configurando WiFi Access Point..."
 echo ""
 read -p "¿Deseas configurar el Access Point WiFi ahora? (y/n) " -n 1 -r
 echo

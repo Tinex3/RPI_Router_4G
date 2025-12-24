@@ -70,24 +70,18 @@ iptables -C FORWARD -i usb0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACC
 
 echo "   ✅ Reglas FORWARD configuradas"
 
-# PILAR 3: NAT/MASQUERADE (reescribir IPs para Internet)
+# PILAR 3: NAT/MASQUERADE (SOLO para red WiFi 192.168.50.0/24)
 echo "   🔧 PILAR 3: NAT/MASQUERADE..."
 
-# NAT genérico
-iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || \
-  iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-
-iptables -t nat -C POSTROUTING -o usb0 -j MASQUERADE 2>/dev/null || \
-  iptables -t nat -A POSTROUTING -o usb0 -j MASQUERADE
-
-# NAT específico para WiFi
+# IMPORTANTE: Solo hacer MASQUERADE del tráfico que viene de la red WiFi
+# Esto NO afecta el tráfico local del ServerPi mismo
 iptables -t nat -C POSTROUTING -s 192.168.50.0/24 -o eth0 -j MASQUERADE 2>/dev/null || \
   iptables -t nat -A POSTROUTING -s 192.168.50.0/24 -o eth0 -j MASQUERADE
 
 iptables -t nat -C POSTROUTING -s 192.168.50.0/24 -o usb0 -j MASQUERADE 2>/dev/null || \
   iptables -t nat -A POSTROUTING -s 192.168.50.0/24 -o usb0 -j MASQUERADE
 
-echo "   ✅ NAT/MASQUERADE configurado"
+echo "   ✅ NAT/MASQUERADE configurado (solo para red WiFi)"
 
 # Guardar reglas
 iptables-save > /etc/iptables.rules
