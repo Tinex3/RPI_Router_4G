@@ -4,12 +4,14 @@
 # - Detecta mejor WAN disponible
 # - Prioridad: EC25 (wwan0) -> Ethernet (eth0)
 # - Ejecutado por wan-failover.timer cada 30s
+# - Respeta modo eth0-lan (eth0 como salida, no entrada)
 # =========================================================
 
 PING_TARGET="8.8.8.8"
 WAN_4G="wwan0"
 WAN_ETH="eth0"
 LOG_TAG="wan-failover"
+ETH_LAN_FLAG="/etc/ec25-router/eth0-lan-mode"
 
 # ---------------------------------------------------------
 # Funciones de detección
@@ -74,6 +76,28 @@ clean_duplicate_routes() {
 # Main Logic
 # ---------------------------------------------------------
 
+# Verificar si eth0 está en modo LAN (salida)
+if [ -f "$ETH_LAN_FLAG" ]; then
+    # eth0 es LAN de salida, solo usar EC25 como WAN
+    CURRENT_WAN=$(get_current_wan)
+    
+    if [ "$CURRENT_WAN" != "$WAN_4G" ]; then
+        # Intentar usar EC25
+        if test_wan "$WAN_4G"; then
+            GW=$(get_gw_4g)
+            if [ -n "$GW" ]; then
+                ip route del default 2>/dev/null || true
+                ip route add default via "$GW" dev "$WAN_4G"
+                log_info "WAN configurada: EC25 (wwan0) - eth0 en modo LAN"
+            fi
+        else
+            log_warn "EC25 sin internet - eth0 en modo LAN (no es WAN)"
+        fi
+    fi
+    exit 0
+fi
+
+# Modo normal: Failover entre EC25 y Ethernet
 CURRENT_WAN=$(get_current_wan)
 
 # Limpiar rutas problemáticas primero

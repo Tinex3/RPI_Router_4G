@@ -6,6 +6,7 @@ Router LTE profesional basado en Quectel EC25 + Raspberry Pi con WiFi Access Poi
 
 ### Core
 - ✅ **WAN Auto-Failover** - Ethernet / LTE automático con prioridad configurable
+- ✅ **Ethernet Dual Mode** - WAN (entrada) o LAN (salida para switch) configurable desde web
 - ✅ **Panel Web** - Dashboard moderno con métricas en tiempo real
 - ✅ **Autenticación** - Login seguro con Flask-Login y hash de passwords
 - ✅ **Monitor LTE** - Señal (CSQ/RSRP/RSRQ/RSSI), operador, tecnología, banda, frecuencia
@@ -19,6 +20,13 @@ Router LTE profesional basado en Quectel EC25 + Raspberry Pi con WiFi Access Poi
 - ✅ **DHCP Server** - Asignación automática de IPs (192.168.50.10-100)
 - ✅ **NAT/Routing** - Comparte internet de eth0/usb0 con clientes WiFi
 - ✅ **Auto-start** - Servicios persistentes con systemd
+
+### Ethernet Modes
+- 🌐 **Modo WAN** (por defecto) - Ethernet recibe internet, failover con EC25
+- 🔌 **Modo LAN** - Ethernet comparte internet del EC25 a switch/router/PC
+- 🔄 **Cambio desde web** - Settings → Modo Ethernet (un click)
+
+Ver: [docs/ETHERNET-MODE.md](docs/ETHERNET-MODE.md)
 
 ### Producción
 - ✅ **Systemd Services** - Arranque automático y gestión de servicios

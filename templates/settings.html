@@ -87,7 +87,7 @@
     <div id="ec25-status" class="status-msg"></div>
   </div>
 
-  <!-- Conexión Ethernet -->
+  <!-- Modo Ethernet -->
   <div class="card">
     <h2>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -96,16 +96,90 @@
         <line x1="6" y1="6" x2="6.01" y2="6"></line>
         <line x1="6" y1="18" x2="6.01" y2="18"></line>
       </svg>
-      Conexión Ethernet
+      Modo Ethernet
     </h2>
-    <p class="hint">Si pierdes conexión a Internet por Ethernet, usa este botón para reparar rutas de red duplicadas.</p>
-    <button class="btn" onclick="fixEthernet()">🔧 Reparar Conexión</button>
+    <p class="hint">
+      <strong>Modo WAN:</strong> Ethernet recibe internet (failover con EC25)<br>
+      <strong>Modo LAN:</strong> Ethernet comparte internet del EC25 (para switch/router)
+    </p>
+    <div style="margin: 15px 0;">
+      <strong>Modo actual:</strong> <span id="eth-mode-current" style="font-weight: bold; color: #3498db;">Cargando...</span>
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button class="btn" onclick="setEthMode('lan')" style="background: #2ecc71;">
+        🔌 Modo LAN (Salida)
+      </button>
+      <button class="btn" onclick="setEthMode('wan')" style="background: #3498db;">
+        🌐 Modo WAN (Entrada)
+      </button>
+      <button class="btn" onclick="fixEthernet()" style="background: #e74c3c;">
+        🔧 Reparar
+      </button>
+    </div>
     <div id="ethernet-status" class="status-msg"></div>
   </div>
 </div>
 
 <script src="/static/js/settings.js"></script>
 <script>
+// Cargar modo actual al iniciar
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const resp = await fetch('/api/system/eth-mode');
+    const data = await resp.json();
+    const modeEl = document.getElementById('eth-mode-current');
+    if (data.mode === 'lan') {
+      modeEl.textContent = '🔌 LAN (Salida)';
+      modeEl.style.color = '#2ecc71';
+    } else {
+      modeEl.textContent = '🌐 WAN (Entrada)';
+      modeEl.style.color = '#3498db';
+    }
+  } catch (e) {
+    console.error('Error loading eth mode:', e);
+  }
+});
+
+async function setEthMode(mode) {
+  const statusEl = document.getElementById('ethernet-status');
+  const modeEl = document.getElementById('eth-mode-current');
+  
+  statusEl.textContent = mode === 'lan' ? 
+    '⏳ Configurando modo LAN...' : 
+    '⏳ Configurando modo WAN...';
+  statusEl.className = 'status-msg';
+  
+  try {
+    const endpoint = mode === 'lan' ? 
+      '/api/system/set-eth-lan' : 
+      '/api/system/set-eth-wan';
+      
+    const resp = await fetch(endpoint, { method: 'POST' });
+    const data = await resp.json();
+    
+    if (data.ok) {
+      statusEl.textContent = data.message;
+      statusEl.className = 'status-msg success';
+      
+      // Actualizar indicador de modo
+      if (mode === 'lan') {
+        modeEl.textContent = '🔌 LAN (Salida)';
+        modeEl.style.color = '#2ecc71';
+      } else {
+        modeEl.textContent = '🌐 WAN (Entrada)';
+        modeEl.style.color = '#3498db';
+      }
+    } else {
+      statusEl.textContent = 'Error: ' + (data.error || 'Operación falló');
+      statusEl.className = 'status-msg error';
+    }
+  } catch (e) {
+    statusEl.textContent = 'Error de conexión';
+    statusEl.className = 'status-msg error';
+    console.error(e);
+  }
+}
+
 async function changeWebPassword() {
   const newPass = document.getElementById('newWebPassword').value.trim();
   const statusEl = document.getElementById('webpass-status');

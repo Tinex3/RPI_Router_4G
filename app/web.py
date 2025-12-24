@@ -671,6 +671,73 @@ def api_system_fix_ethernet():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@web.route("/api/system/eth-mode")
+@login_required
+def api_system_eth_mode():
+    """Obtiene el modo actual de eth0 (wan/lan)"""
+    flag_path = "/etc/ec25-router/eth0-lan-mode"
+    mode = "lan" if os.path.exists(flag_path) else "wan"
+    return jsonify({"mode": mode})
+
+
+@web.route("/api/system/set-eth-lan", methods=["POST"])
+@login_required
+def api_system_set_eth_lan():
+    """Configura eth0 como LAN (salida de internet)"""
+    logging.warning("Setting eth0 to LAN mode by %s", current_user.username)
+    try:
+        script = "/opt/ec25-router/scripts/setup-eth-lan.sh"
+        result = subprocess.run(
+            ["sudo", "bash", script],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode == 0:
+            return jsonify({
+                "ok": True,
+                "message": "✅ Ethernet configurado como LAN (salida). Conecta tu switch/router."
+            })
+        else:
+            return jsonify({
+                "ok": False,
+                "error": f"Error: {result.stderr}"
+            }), 500
+    except Exception as e:
+        logging.error("Error setting eth LAN mode: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@web.route("/api/system/set-eth-wan", methods=["POST"])
+@login_required
+def api_system_set_eth_wan():
+    """Restaura eth0 como WAN (entrada de internet)"""
+    logging.warning("Restoring eth0 to WAN mode by %s", current_user.username)
+    try:
+        script = "/opt/ec25-router/scripts/restore-eth-wan.sh"
+        result = subprocess.run(
+            ["sudo", "bash", script],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode == 0:
+            return jsonify({
+                "ok": True,
+                "message": "✅ Ethernet restaurado como WAN (entrada). Failover habilitado."
+            })
+        else:
+            return jsonify({
+                "ok": False,
+                "error": f"Error: {result.stderr}"
+            }), 500
+    except Exception as e:
+        logging.error("Error setting eth WAN mode: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @web.route("/api/system/info")
 @login_required
 def api_system_info():
