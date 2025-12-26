@@ -745,6 +745,73 @@ def api_system_info():
     return jsonify(get_system_info())
 
 
+@web.route("/api/system/wan-mode")
+@login_required
+def api_system_wan_mode():
+    """Obtiene el modo WAN actual"""
+    config_file = "/etc/ec25-router/wan-mode.conf"
+    mode = "auto-smart"  # Default
+    
+    if os.path.exists(config_file):
+        try:
+            with open(config_file) as f:
+                for line in f:
+                    if line.startswith("MODE="):
+                        mode = line.strip().split("=", 1)[1]
+                        break
+        except:
+            pass
+    
+    return jsonify({"mode": mode})
+
+
+@web.route("/api/system/set-wan-mode", methods=["POST"])
+@login_required
+def api_system_set_wan_mode():
+    """Configura el modo WAN (ethernet-only, lte-only, auto-smart)"""
+    data = request.get_json()
+    mode = data.get("mode", "")
+    
+    if mode not in ["ethernet-only", "lte-only", "auto-smart"]:
+        return jsonify({"ok": False, "error": "Modo inválido"}), 400
+    
+    logging.warning("Setting WAN mode to %s by %s", mode, current_user.username)
+    
+    try:
+        config_file = "/etc/ec25-router/wan-mode.conf"
+        config_dir = os.path.dirname(config_file)
+        
+        # Crear directorio si no existe
+        subprocess.run(["sudo", "mkdir", "-p", config_dir], timeout=5)
+        
+        # Escribir configuración
+        subprocess.run(
+            ["sudo", "bash", "-c", f"echo 'MODE={mode}' > {config_file}"],
+            timeout=5
+        )
+        
+        # Reiniciar servicio
+        subprocess.run(
+            ["sudo", "systemctl", "restart", "wan-failover.service"],
+            timeout=10
+        )
+        
+        mode_names = {
+            "ethernet-only": "Ethernet ONLY",
+            "lte-only": "LTE ONLY",
+            "auto-smart": "Auto (Smart Failover)"
+        }
+        
+        return jsonify({
+            "ok": True,
+            "message": f"✅ Modo WAN configurado: {mode_names[mode]}"
+        })
+        
+    except Exception as e:
+        logging.error("Error setting WAN mode: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @web.route("/restarting")
 def restarting():
     """Pagina de reinicio"""

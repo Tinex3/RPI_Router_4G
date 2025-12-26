@@ -118,12 +118,44 @@
     </div>
     <div id="ethernet-status" class="status-msg"></div>
   </div>
+
+  <!-- Modo WAN (Failover) -->
+  <div class="card">
+    <h2>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+        <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
+      </svg>
+      Modo WAN (Failover)
+    </h2>
+    <p class="hint">
+      <strong>Ethernet ONLY:</strong> Solo eth0, sin failover automático<br>
+      <strong>LTE ONLY:</strong> Solo EC25, sin failover automático<br>
+      <strong>Auto (Smart):</strong> Prioridad Ethernet, cambia solo cuando falla (sin flapping)
+    </p>
+    <div style="margin: 15px 0;">
+      <strong>Modo activo:</strong> <span id="wan-mode-current" style="font-weight: bold; color: #9b59b6;">Cargando...</span>
+    </div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <button class="btn" onclick="setWanMode('ethernet-only')" style="background: #3498db;">
+        🌐 Ethernet ONLY
+      </button>
+      <button class="btn" onclick="setWanMode('lte-only')" style="background: #e67e22;">
+        📡 LTE ONLY
+      </button>
+      <button class="btn" onclick="setWanMode('auto-smart')" style="background: #9b59b6;">
+        🔄 Auto (Smart)
+      </button>
+    </div>
+    <div id="wan-mode-status" class="status-msg"></div>
+  </div>
 </div>
 
 <script src="/static/js/settings.js"></script>
 <script>
-// Cargar modo actual al iniciar
+// Cargar modos actuales al iniciar
 window.addEventListener('DOMContentLoaded', async () => {
+  // Modo Ethernet
   try {
     const resp = await fetch('/api/system/eth-mode');
     const data = await resp.json();
@@ -138,7 +170,78 @@ window.addEventListener('DOMContentLoaded', async () => {
   } catch (e) {
     console.error('Error loading eth mode:', e);
   }
+  
+  // Modo WAN
+  try {
+    const resp = await fetch('/api/system/wan-mode');
+    const data = await resp.json();
+    const modeEl = document.getElementById('wan-mode-current');
+    const modeNames = {
+      'ethernet-only': '🌐 Ethernet ONLY',
+      'lte-only': '📡 LTE ONLY',
+      'auto-smart': '🔄 Auto (Smart)'
+    };
+    const modeColors = {
+      'ethernet-only': '#3498db',
+      'lte-only': '#e67e22',
+      'auto-smart': '#9b59b6'
+    };
+    modeEl.textContent = modeNames[data.mode] || data.mode;
+    modeEl.style.color = modeColors[data.mode] || '#9b59b6';
+  } catch (e) {
+    console.error('Error loading WAN mode:', e);
+  }
 });
+
+async function setWanMode(mode) {
+  const statusEl = document.getElementById('wan-mode-status');
+  const modeEl = document.getElementById('wan-mode-current');
+  
+  const modeNames = {
+    'ethernet-only': 'Ethernet ONLY',
+    'lte-only': 'LTE ONLY',
+    'auto-smart': 'Auto (Smart)'
+  };
+  
+  statusEl.textContent = `⏳ Configurando ${modeNames[mode]}...`;
+  statusEl.className = 'status-msg';
+  
+  try {
+    const resp = await fetch('/api/system/set-wan-mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: mode })
+    });
+    
+    const data = await resp.json();
+    
+    if (data.ok) {
+      statusEl.textContent = data.message;
+      statusEl.className = 'status-msg success';
+      
+      // Actualizar indicador de modo
+      const displayNames = {
+        'ethernet-only': '🌐 Ethernet ONLY',
+        'lte-only': '📡 LTE ONLY',
+        'auto-smart': '🔄 Auto (Smart)'
+      };
+      const colors = {
+        'ethernet-only': '#3498db',
+        'lte-only': '#e67e22',
+        'auto-smart': '#9b59b6'
+      };
+      modeEl.textContent = displayNames[mode];
+      modeEl.style.color = colors[mode];
+    } else {
+      statusEl.textContent = 'Error: ' + (data.error || 'Operación falló');
+      statusEl.className = 'status-msg error';
+    }
+  } catch (e) {
+    statusEl.textContent = 'Error de conexión';
+    statusEl.className = 'status-msg error';
+    console.error(e);
+  }
+}
 
 async function setEthMode(mode) {
   const statusEl = document.getElementById('ethernet-status');
