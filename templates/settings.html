@@ -97,6 +97,11 @@
         <line x1="6" y1="18" x2="6.01" y2="18"></line>
       </svg>
       Modo Ethernet
+      <span class="tooltip-icon" data-tooltip="Configura cómo se usa el puerto Ethernet (eth0) del Raspberry Pi.
+
+• WAN (Entrada): eth0 recibe internet del router por cable. Ideal para tener backup de red fija.
+
+• LAN (Salida): eth0 comparte el internet del EC25 hacia un switch/router externo. Ideal para distribuir 4G a múltiples dispositivos.">i</span>
     </h2>
     
     <div class="form-group">
@@ -148,6 +153,13 @@
         <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
       </svg>
       Modo WAN (Failover)
+      <span class="tooltip-icon" data-tooltip="Define cómo el sistema gestiona el acceso a internet cuando tienes múltiples conexiones disponibles.
+
+• Ethernet ONLY: Solo usa eth0, nunca cambia a 4G (ahorra datos móviles).
+
+• LTE ONLY: Solo usa EC25, nunca cambia a Ethernet (router 4G puro).
+
+• Auto (Smart): Usa Ethernet primero, cambia a 4G solo si falla. Sistema inteligente sin flapping (cambios constantes).">i</span>
     </h2>
     
     <div class="form-group">
