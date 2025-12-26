@@ -1086,3 +1086,101 @@ code {
 .sidebar-overlay.show {
   display: block;
 }
+
+/* =====================================================
+   Mode Configuration Styles
+   ===================================================== */
+
+/* Mode indicator */
+.mode-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: var(--border-radius-sm);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.mode-indicator .mode-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.mode-indicator .mode-text {
+  font-weight: 600;
+}
+
+/* Button group */
+.btn-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 15px;
+}
+
+.btn-group .btn {
+  flex: 1;
+  min-width: 140px;
+  font-size: 0.9rem;
+}
+
+.btn-group .btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Button variants */
+.btn-success {
+  background: #22c55e;
+}
+
+.btn-success:hover {
+  background: #16a34a;
+}
+
+.btn-primary {
+  background: #3b82f6;
+}
+
+.btn-primary:hover {
+  background: #2563eb;
+}
+
+.btn-warning {
+  background: #f59e0b;
+  color: #1a1a1a;
+}
+
+.btn-warning:hover {
+  background: #d97706;
+}
+
+.btn-danger {
+  background: #ef4444;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+.btn-purple {
+  background: #9b59b6;
+}
+
+.btn-purple:hover {
+  background: #8e44ad;
+}
+
+/* Responsive button group */
+@media (max-width: 768px) {
+  .btn-group {
+    flex-direction: column;
+  }
+  
+  .btn-group .btn {
+    width: 100%;
+  }
+}
