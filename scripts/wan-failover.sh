@@ -46,6 +46,45 @@ get_gw_4g() {
     ip route show dev "$WAN_4G" 2>/dev/null | awk '/via/ {print $3; exit}' | head -1
 }
 
+# Auto-reparar gateway faltante
+auto_repair_gateway() {
+    local iface="$1"
+    
+    # Verificar si tiene IP pero no gateway
+    if ip addr show "$iface" 2>/dev/null | grep -q "inet "; then
+        local gw=""
+        if [ "$iface" = "$WAN_ETH" ]; then
+            gw=$(get_gw_eth)
+        elif [ "$iface" = "$WAN_4G" ]; then
+            gw=$(get_gw_4g)
+        fi
+        
+        if [ -z "$gw" ]; then
+            log_warn "Auto-reparación: $iface tiene IP pero sin gateway, ejecutando dhclient..."
+            dhclient -r "$iface" 2>/dev/null || true
+            sleep 2
+            dhclient "$iface" 2>/dev/null || true
+            sleep 3
+            
+            # Verificar si se obtuvo gateway
+            if [ "$iface" = "$WAN_ETH" ]; then
+                gw=$(get_gw_eth)
+            elif [ "$iface" = "$WAN_4G" ]; then
+                gw=$(get_gw_4g)
+            fi
+            
+            if [ -n "$gw" ]; then
+                log_info "✅ Auto-reparación exitosa: $iface gateway obtenido ($gw)"
+                return 0
+            else
+                log_error "❌ Auto-reparación falló: $iface sin gateway después de dhclient"
+                return 1
+            fi
+        fi
+    fi
+    return 0
+}
+
 # Ping específico por interfaz (más robusto)
 test_wan_ping() {
     local iface="$1"
@@ -161,6 +200,9 @@ clean_duplicate_routes
 if [ "$WAN_MODE" = "ethernet-only" ]; then
     CURRENT_WAN=$(get_current_wan)
     
+    # Auto-reparar gateway si falta
+    auto_repair_gateway "$WAN_ETH"
+    
     if [ "$CURRENT_WAN" != "$WAN_ETH" ]; then
         # Forzar Ethernet
         GW=$(get_gw_eth)
@@ -182,6 +224,8 @@ if [ "$WAN_MODE" = "ethernet-only" ]; then
         # Monitorear que Ethernet sigue vivo
         if ! test_wan_ping "$WAN_ETH" 3; then
             log_error "Ethernet ONLY: Conectividad perdida"
+            # Intentar auto-reparación
+            auto_repair_gateway "$WAN_ETH"
         fi
     fi
     exit 0
@@ -193,6 +237,9 @@ fi
 
 if [ "$WAN_MODE" = "lte-only" ]; then
     CURRENT_WAN=$(get_current_wan)
+    
+    # Auto-reparar gateway si falta
+    auto_repair_gateway "$WAN_4G"
     
     if [ "$CURRENT_WAN" != "$WAN_4G" ]; then
         # Forzar LTE
@@ -206,6 +253,8 @@ if [ "$WAN_MODE" = "lte-only" ]; then
         # Monitorear que LTE sigue vivo
         if ! test_wan_ping "$WAN_4G" 3; then
             log_error "LTE ONLY: Conectividad perdida"
+            # Intentar auto-reparación
+            auto_repair_gateway "$WAN_4G"
         fi
     fi
     exit 0
@@ -226,6 +275,9 @@ fi
 if [ -z "$CURRENT_WAN" ]; then
     log_info "Sin WAN activa, estableciendo con prioridad Ethernet..."
     
+    # Auto-reparar gateway si falta
+    auto_repair_gateway "$WAN_ETH"
+    
     # Probar Ethernet primero
     if test_wan_ping "$WAN_ETH" 2; then
         GW=$(get_gw_eth)
@@ -242,6 +294,9 @@ if [ -z "$CURRENT_WAN" ]; then
             exit 0
         fi
     fi
+    
+    # Auto-reparar gateway LTE si falta
+    auto_repair_gateway "$WAN_4G"
     
     # Fallback a LTE
     if test_wan_ping "$WAN_4G" 2; then
@@ -262,12 +317,16 @@ fi
 
 log_info "Monitoreando WAN activa: $CURRENT_WAN"
 
+# Auto-reparar gateway si falta (prevención)
+auto_repair_gateway "$CURRENT_WAN"
+
 # Hacer 3 pings para estar seguro del fallo
 if test_wan_ping "$CURRENT_WAN" 3; then
     log_info "WAN activa ($CURRENT_WAN) funcionando correctamente"
     
     # Si estamos en LTE pero Ethernet volvió, cambiar (prioridad Ethernet)
     if [ "$CURRENT_WAN" = "$WAN_4G" ]; then
+        auto_repair_gateway "$WAN_ETH"
         if test_wan_ping "$WAN_ETH" 2; then
             GW=$(get_gw_eth)
             if [ -n "$GW" ]; then
@@ -288,6 +347,8 @@ log_warn "WAN activa ($CURRENT_WAN) FALLÓ - Iniciando failover..."
 
 if [ "$CURRENT_WAN" = "$WAN_ETH" ]; then
     # Ethernet falló, cambiar a LTE
+    auto_repair_gateway "$WAN_4G"
+    
     if test_wan_ping "$WAN_4G" 2; then
         GW=$(get_gw_4g)
         if [ -n "$GW" ]; then
@@ -301,6 +362,8 @@ if [ "$CURRENT_WAN" = "$WAN_ETH" ]; then
     fi
 else
     # LTE falló, intentar Ethernet
+    auto_repair_gateway "$WAN_ETH"
+    
     if test_wan_ping "$WAN_ETH" 2; then
         GW=$(get_gw_eth)
         if [ -z "$GW" ]; then
