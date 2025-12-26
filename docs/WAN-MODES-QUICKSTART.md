@@ -76,7 +76,31 @@ journalctl -u wan-failover.service -f
 
 ---
 
-## 📋 Ejemplos de Logs
+## � Auto-Reparación (NUEVO)
+
+**Problema común:** eth0 tiene IP pero sin gateway → "Network is unreachable"
+
+**Solución automática:**
+- Sistema detecta gateway faltante cada 30s
+- Ejecuta `dhclient` automáticamente
+- Se repara sin intervención manual
+
+**Logs de auto-reparación:**
+
+```bash
+[WARN] Auto-reparación: eth0 tiene IP pero sin gateway, ejecutando dhclient...
+[INFO] ✅ Auto-reparación exitosa: eth0 gateway obtenido (192.168.1.1)
+```
+
+**Si es urgente (manual):**
+
+```bash
+sudo dhclient -r eth0 && sudo dhclient eth0
+```
+
+---
+
+## �📋 Ejemplos de Logs
 
 **Modo Auto - Funcionando bien:**
 ```

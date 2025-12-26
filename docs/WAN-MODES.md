@@ -119,7 +119,59 @@ sudo systemctl restart wan-failover.service
 
 ---
 
-## 🔍 Verificación
+## � Auto-Reparación de Gateway
+
+### Problema Común
+
+Después de instalar o reiniciar, `eth0` puede tener IP pero **sin gateway**:
+
+```bash
+ip addr show eth0
+# inet 192.168.1.32/24 ← Tiene IP ✅
+
+ip route show
+# NO hay "default via..." ← Sin gateway ❌
+```
+
+Esto causa:
+- `Network is unreachable` en apt update/git pull
+- SSH funciona localmente pero sin internet
+- WiFi AP sin conectividad
+
+### Solución Automática
+
+El sistema **detecta y repara automáticamente** cada 30 segundos:
+
+**wan-failover.sh** incluye `auto_repair_gateway()`:
+
+1. Detecta si interfaz tiene IP pero no gateway
+2. Ejecuta `dhclient -r && dhclient` automáticamente
+3. Verifica si se obtuvo gateway
+4. Registra operación en logs
+
+**Logs de auto-reparación:**
+
+```bash
+[WARN] Auto-reparación: eth0 tiene IP pero sin gateway, ejecutando dhclient...
+[INFO] ✅ Auto-reparación exitosa: eth0 gateway obtenido (192.168.1.1)
+```
+
+O si falla:
+
+```bash
+[ERROR] ❌ Auto-reparación falló: eth0 sin gateway después de dhclient
+```
+
+**Cuándo se ejecuta:**
+- Ethernet ONLY: Al iniciar y al detectar fallo de conectividad
+- LTE ONLY: Al iniciar y al detectar fallo de conectividad  
+- Auto (Smart): Al iniciar, durante monitoreo, y antes de failover
+
+**Sin intervención manual necesaria** - El sistema se autorrepara.
+
+---
+
+## �🔍 Verificación
 
 ### Ver modo actual:
 
@@ -253,7 +305,38 @@ ip route show
 # Verificar IPs asignadas
 ip addr show eth0
 ip addr show wwan0
+
+# Verificar gateway faltante (problema común)
+ip route show | grep default
+# Si no aparece, esperar 30s a que auto_repair_gateway() lo repare
+# O reparar manualmente: sudo dhclient eth0
 ```
+
+### Error "Network is unreachable"
+
+**Problema:** apt update, git pull, etc. fallan con este error
+
+**Causa común:** Falta default gateway (eth0 tiene IP pero sin ruta)
+
+**Verificar:**
+
+```bash
+ip route show | grep default
+# Si no aparece nada → Falta gateway
+```
+
+**Solución:**
+
+1. **Automática (recomendado):** Esperar máximo 30 segundos
+   - El servicio wan-failover detecta y repara automáticamente
+   - Ver logs: `journalctl -u wan-failover.service -f`
+   - Buscar: `✅ Auto-reparación exitosa`
+
+2. **Manual (urgente):**
+   ```bash
+   sudo dhclient -r eth0 && sudo dhclient eth0
+   ip route show | grep default  # Verificar que apareció
+   ```
 
 ---
 
