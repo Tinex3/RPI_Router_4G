@@ -199,13 +199,9 @@ if command -v docker &> /dev/null; then
     sudo usermod -aG docker "$CURRENT_USER"
     DOCKER_GROUP_ADDED=true
   fi
-  # Verificar si config.txt tiene las configuraciones de LoRaWAN
-  if grep -q "^dtoverlay=disable-bt" /boot/firmware/config.txt 2>/dev/null; then
-    DOCKER_GROUP_ADDED=true  # Marcar que necesita reinicio
-  fi
 else
   echo "   ℹ️  Docker no está instalado"
-  echo "   Para instalar Docker y configurar LoRaWAN:"
+  echo "   Para instalar Docker:"
   echo "      sudo bash $INSTALL_DIR/scripts/setup-docker.sh"
 fi
 
@@ -223,10 +219,8 @@ fi
 
 # Aviso importante sobre Docker si se agregó al grupo
 if [ "$DOCKER_GROUP_ADDED" = true ]; then
-  echo "⚠️  IMPORTANTE - Docker y LoRaWAN:"
+  echo "⚠️  IMPORTANTE - Docker:"
   echo "   ✅ Docker instalado correctamente"
-  echo "   ✅ SPI activado en /boot/firmware/config.txt"
-  echo "   ✅ Bluetooth desactivado (libera recursos)"
   echo "   ✅ Usuario agregado al grupo 'docker'"
   echo ""
 fi
@@ -253,7 +247,7 @@ echo "   python -c \"from werkzeug.security import generate_password_hash; print
 echo "   # Copiar hash a data/config.json → auth.password_hash"
 echo "   sudo systemctl restart ec25-router"
 echo ""
-echo "📚 Documentación: $INSTALL_DIR/ETAPA4.md"
+echo "📚 Documentación: $INSTALL_DIR/README.md"
 echo ""
 
 # Mensaje de reinicio si es necesario
@@ -262,8 +256,7 @@ if [ "$NEEDS_REBOOT" = true ]; then
   echo "║              🔄 REINICIO NECESARIO                                ║"
   echo "╚════════════════════════════════════════════════════════════════════╝"
   echo ""
-  echo "⚠️  Se realizaron cambios en /boot/firmware/config.txt"
-  echo "   (SPI activado + Bluetooth desactivado para LoRaWAN)"
+  echo "⚠️  Se realizaron cambios que requieren reinicio"
   echo ""
   echo "🔄 DEBES REINICIAR el sistema para que los cambios surtan efecto:"
   echo ""

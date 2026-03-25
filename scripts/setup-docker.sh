@@ -76,40 +76,12 @@ systemctl enable docker
 systemctl start docker
 
 echo ""
-echo "[5/7] Verificando instalacion..."
+echo "[5/5] Verificando instalacion..."
 docker --version
 docker compose version 2>/dev/null || echo "[INFO] docker-compose plugin no disponible, usando comando docker compose"
 
 # Limpiar
 rm -f /tmp/get-docker.sh
-
-echo ""
-echo "[6/7] Configurando hardware para LoRaWAN (SPI + Bluetooth)..."
-CONFIG_FILE="/boot/firmware/config.txt"
-
-# Activar SPI
-if ! grep -q "^dtparam=spi=on" "$CONFIG_FILE"; then
-    echo "dtparam=spi=on" >> "$CONFIG_FILE"
-    echo "   ✅ SPI activado"
-else
-    echo "   ℹ️  SPI ya estaba activado"
-fi
-
-# Desactivar Bluetooth (libera recursos y evita conflictos)
-if ! grep -q "^dtoverlay=disable-bt" "$CONFIG_FILE"; then
-    echo "dtoverlay=disable-bt" >> "$CONFIG_FILE"
-    echo "   ✅ Bluetooth desactivado"
-else
-    echo "   ℹ️  Bluetooth ya estaba desactivado"
-fi
-
-echo ""
-echo "[7/7] Deteniendo servicio Bluetooth..."
-systemctl disable hciuart.service 2>/dev/null || true
-systemctl stop hciuart.service 2>/dev/null || true
-systemctl disable bluetooth.service 2>/dev/null || true
-systemctl stop bluetooth.service 2>/dev/null || true
-echo "   ✅ Servicios Bluetooth detenidos"
 
 echo ""
 echo "========================================================================"
@@ -123,37 +95,5 @@ echo ""
 echo "   Opcion 2: Ejecutar en tu terminal actual:"
 echo "             newgrp docker"
 echo ""
-echo ""
-echo "========================================================================"
-echo "       ⚠️  REINICIO NECESARIO                                          "
-echo "========================================================================"
-echo ""
-echo "Se han realizado cambios en /boot/firmware/config.txt:"
-echo "   ✅ SPI activado (necesario para LoRaWAN)"
-echo "   ✅ Bluetooth desactivado (libera recursos)"
-echo ""
-echo "🔄 DEBES REINICIAR EL SISTEMA para que los cambios surtan efecto:"
-echo ""
-echo "   sudo reboot"
-echo ""
-echo "========================================================================"
-echo ""
 echo "Verificar con: docker run hello-world"
-echo ""
-
-# Ejecutar detección de Gateway EUI automáticamente
-echo ""
-echo "========================================================================"
-echo "         Detectando Gateway EUI                                         "
-echo "========================================================================"
-echo ""
-echo "[INFO] Ejecutando detección automática del Gateway EUI..."
-
-if docker run -it --privileged --rm -e GATEWAY_EUI_SOURCE=chip xoseperez/basicstation:latest gateway_eui; then
-    echo "[OK] Gateway EUI detectado correctamente"
-else
-    echo "[WARNING] No se pudo detectar el Gateway EUI automáticamente"
-    echo "          Puedes ejecutarlo manualmente más tarde desde la interfaz web"
-fi
-
 echo ""

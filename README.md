@@ -128,9 +128,9 @@ sudo systemctl restart hostapd
 
 ## 📚 Documentación
 
-- [ETAPA4.md](ETAPA4.md) - **Guía completa de instalación** (⭐ EMPEZAR AQUÍ)
-- [ETAPA3.md](ETAPA3.md) - Router administrable
-- [ETAPA2.md](ETAPA2.md) - WAN failover (deprecado)
+- [WAN-MODES.md](docs/WAN-MODES.md) - Modos WAN y failover
+- [ETHERNET-MODE.md](docs/ETHERNET-MODE.md) - Modo Ethernet
+- [AUTO-REPAIR-GATEWAY.md](docs/AUTO-REPAIR-GATEWAY.md) - Auto-reparación
 
 ## 🔐 Cambiar password
 

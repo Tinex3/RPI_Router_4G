@@ -22,8 +22,7 @@ echo "   - Configuraciones de hostapd y dnsmasq"
 echo "   - Reglas iptables del AP"
 echo "   - Directorio /opt/ec25-router"
 echo "   - Logs en /var/log/ec25-router"
-echo "   - Contenedor BasicStation (Docker)"
-echo "   - Carpeta BasicStation"
+
 echo ""
 read -p "Continuar con la desinstalacion? (y/n) " -n 1 -r
 echo
@@ -118,26 +117,7 @@ systemctl restart NetworkManager 2>/dev/null || true
 echo "   [OK] wlan0 liberada"
 
 echo ""
-echo "[7/10] Deteniendo y eliminando contenedor BasicStation..."
-if command -v docker &> /dev/null; then
-  # Detener contenedor si existe
-  docker stop basicstation 2>/dev/null || true
-  # Eliminar contenedor
-  docker rm basicstation 2>/dev/null || true
-  # Preguntar si eliminar imagen
-  read -p "   Eliminar imagen Docker de BasicStation? (y/n) " -n 1 -r
-  echo
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
-    docker rmi xoseperez/basicstation:latest 2>/dev/null || true
-    echo "   [OK] Imagen BasicStation eliminada"
-  fi
-else
-  echo "   [INFO] Docker no instalado, saltando..."
-fi
-echo "   [OK] BasicStation limpiado"
-
-echo ""
-echo "[8/10] Eliminando directorio de instalacion..."
+echo "[7/10] Eliminando directorio de instalacion..."
 rm -rf /opt/ec25-router
 echo "   [OK] /opt/ec25-router eliminado"
 
