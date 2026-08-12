@@ -28,3 +28,18 @@ Thumbs.db
 
 # Config sensible (si contiene passwords)
 # data/config.json  # Descomentar si guardas passwords reales
+
+# Environment files with secrets
+.env
+backend/.env
+
+# Virtual environments
+backend/.venv/
+
+# Database
+data/router.db
+
+# Node (for future frontend)
+node_modules/
+frontend/dist/
+frontend/.env
